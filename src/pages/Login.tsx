@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Mail, Lock, Eye, EyeOff, ArrowRight, Check, Loader2 } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,11 +10,14 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ui/use-toast";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const { signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -28,21 +31,18 @@ const Login = () => {
     setIsLoading(true);
     
     try {
-      // TODO: Replace with Supabase authentication
-      // Mock successful login for now
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await signIn(email, password);
       
       toast({
         title: "Login successful",
         description: "Welcome back to ScamFT!",
       });
       
-      // Redirect to the page they tried to visit or home
-      navigate(from, { replace: true });
-    } catch (error) {
+      // Redirect is handled in the signIn function
+    } catch (error: any) {
       toast({
         title: "Login failed",
-        description: "Please check your credentials and try again.",
+        description: error.message || "Please check your credentials and try again.",
         variant: "destructive",
       });
     } finally {
@@ -54,24 +54,22 @@ const Login = () => {
     setIsLoading(true);
     
     try {
-      // TODO: Replace with Supabase Google OAuth
-      // Mock successful login for now
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      toast({
-        title: "Login successful",
-        description: "Welcome back to ScamFT!",
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/`
+        }
       });
       
-      // Redirect to the page they tried to visit or home
-      navigate(from, { replace: true });
-    } catch (error) {
+      if (error) throw error;
+      
+      // The redirect is handled by Supabase
+    } catch (error: any) {
       toast({
         title: "Google login failed",
-        description: "Please try again or use email login.",
+        description: error.message || "Please try again or use email login.",
         variant: "destructive",
       });
-    } finally {
       setIsLoading(false);
     }
   };

@@ -5,52 +5,27 @@ import { motion } from "framer-motion";
 import { 
   ArrowLeft, 
   CreditCard, 
-  WalletCards, 
   Shield, 
   CheckCircle2,
   Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ui/use-toast";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import { useCartStore } from "@/services/cartService";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const Checkout = () => {
   const navigate = useNavigate();
   const { items, getTotal, clearCart } = useCartStore();
   const { toast } = useToast();
+  const { user } = useAuth();
   
-  const [paymentMethod, setPaymentMethod] = useState<string>("card");
   const [processing, setProcessing] = useState<boolean>(false);
   const [completed, setCompleted] = useState<boolean>(false);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  
-  // Check authentication status
-  useEffect(() => {
-    // This will be replaced with actual auth check when Supabase is integrated
-    const checkAuth = async () => {
-      // Mock authentication check - will be replaced with Supabase auth
-      const mockIsAuthenticated = false;
-      setIsAuthenticated(mockIsAuthenticated);
-      
-      if (!mockIsAuthenticated) {
-        toast({
-          title: "Authentication required",
-          description: "Please sign in to complete your purchase",
-          variant: "destructive"
-        });
-        // Redirect to login after a short delay
-        setTimeout(() => navigate("/login"), 2000);
-      }
-    };
-    
-    checkAuth();
-  }, [navigate, toast]);
   
   // If cart is empty, redirect to cart page
   if (items.length === 0 && !completed) {
@@ -63,11 +38,11 @@ const Checkout = () => {
   const serviceFee = subtotal * 0.025; // 2.5% service fee
   const total = subtotal + serviceFee;
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Prevent checkout if not authenticated
-    if (!isAuthenticated) {
+    if (!user) {
       toast({
         title: "Authentication required",
         description: "Please sign in to complete your purchase",
@@ -80,9 +55,41 @@ const Checkout = () => {
     // Show processing state
     setProcessing(true);
     
-    // Simulate payment processing
-    setTimeout(() => {
+    try {
+      const response = await supabase.functions.invoke('create-checkout', {
+        body: {
+          items: items,
+          userId: user.id,
+          successUrl: `${window.location.origin}/profile?success=true`,
+          cancelUrl: `${window.location.origin}/cart?canceled=true`
+        }
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to create checkout session');
+      }
+
+      // Redirect to Stripe Checkout
+      if (response.data?.url) {
+        window.location.href = response.data.url;
+      } else {
+        throw new Error('No checkout URL received');
+      }
+    } catch (error: any) {
+      console.error('Checkout error:', error);
+      toast({
+        title: "Checkout failed",
+        description: error.message || "Could not process payment. Please try again.",
+        variant: "destructive"
+      });
       setProcessing(false);
+    }
+  };
+  
+  // Check for success parameter in URL (this would happen when returning from successful payment)
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    if (query.get('success') === 'true') {
       setCompleted(true);
       clearCart();
       
@@ -90,8 +97,8 @@ const Checkout = () => {
         title: "Purchase successful!",
         description: "Your NFTs have been added to your collection.",
       });
-    }, 2000);
-  };
+    }
+  }, []);
   
   if (completed) {
     return (
@@ -137,7 +144,7 @@ const Checkout = () => {
     <div className="flex flex-col min-h-screen">
       <Navbar />
       <main className="flex-grow pt-28 pb-16">
-        <div className="page-container max-w-4xl">
+        <div className="page-container max-w-4xl mx-auto px-4">
           {/* Back Button */}
           <button
             onClick={() => navigate(-1)}
@@ -150,93 +157,27 @@ const Checkout = () => {
           <h1 className="text-2xl font-medium mb-8">Checkout</h1>
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Main Checkout Form */}
+            {/* Checkout Form */}
             <div className="lg:col-span-2">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
               >
-                <form onSubmit={handleSubmit} className="space-y-8">
-                  {/* Payment Method */}
+                <form onSubmit={handleCheckout} className="space-y-8">
+                  {/* Payment Information */}
                   <div className="glass rounded-xl p-6 space-y-4">
                     <h2 className="text-lg font-medium">Payment Method</h2>
                     
-                    <RadioGroup 
-                      defaultValue="card" 
-                      value={paymentMethod}
-                      onValueChange={setPaymentMethod}
-                      className="space-y-3"
-                    >
-                      <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-secondary/20 transition-colors cursor-pointer">
-                        <RadioGroupItem value="card" id="card" />
-                        <Label htmlFor="card" className="flex items-center cursor-pointer flex-1">
-                          <CreditCard className="h-5 w-5 mr-3 text-primary" />
-                          <div>
-                            <div>Credit / Debit Card</div>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              Pay with Visa, Mastercard, or American Express
-                            </div>
-                          </div>
-                        </Label>
-                      </div>
-                      
-                      <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-secondary/20 transition-colors cursor-pointer">
-                        <RadioGroupItem value="wallet" id="wallet" />
-                        <Label htmlFor="wallet" className="flex items-center cursor-pointer flex-1">
-                          <WalletCards className="h-5 w-5 mr-3 text-primary" />
-                          <div>
-                            <div>Crypto Wallet</div>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              Connect with MetaMask or another web3 wallet
-                            </div>
-                          </div>
-                        </Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-                  
-                  {/* Billing Details */}
-                  <div className="glass rounded-xl p-6 space-y-4">
-                    <h2 className="text-lg font-medium">Billing Information</h2>
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="firstName">First Name</Label>
-                        <Input id="firstName" required />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="lastName">Last Name</Label>
-                        <Input id="lastName" required />
+                    <div className="flex items-center space-x-3 p-3 rounded-lg border border-border bg-secondary/10">
+                      <CreditCard className="h-5 w-5 mr-3 text-primary" />
+                      <div>
+                        <div>Stripe Secure Checkout</div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          You'll be redirected to Stripe to complete your purchase securely.
+                        </div>
                       </div>
                     </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email Address</Label>
-                      <Input id="email" type="email" required />
-                    </div>
-                    
-                    {paymentMethod === "card" && (
-                      <>
-                        <div className="space-y-2">
-                          <Label htmlFor="cardNumber">Card Number</Label>
-                          <Input id="cardNumber" placeholder="•••• •••• •••• ••••" required />
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="expiry">Expiry Date</Label>
-                            <Input id="expiry" placeholder="MM/YY" required />
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <Label htmlFor="cvc">CVC</Label>
-                            <Input id="cvc" placeholder="•••" required />
-                          </div>
-                        </div>
-                      </>
-                    )}
                   </div>
                   
                   {/* Submit Button */}
@@ -249,10 +190,10 @@ const Checkout = () => {
                     {processing ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Processing Payment...
+                        Processing...
                       </>
                     ) : (
-                      <>Complete Purchase</>
+                      <>Proceed to Payment</>
                     )}
                   </Button>
                 </form>

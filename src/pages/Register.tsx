@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Mail, Lock, Eye, EyeOff, User, Check, Loader2 } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, User, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,11 +10,15 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ui/use-toast";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const Register = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signUp } = useAuth();
   const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -25,20 +29,21 @@ const Register = () => {
     setIsLoading(true);
     
     try {
-      // TODO: Replace with Supabase authentication
-      // Mock successful registration for now
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await signUp(email, password, { 
+        full_name: name,
+        username: username || email.split('@')[0] 
+      });
       
       toast({
         title: "Registration successful",
         description: "Welcome to ScamFT! You can now sign in.",
       });
       
-      navigate("/login");
-    } catch (error) {
+      // Redirect is handled in the signUp function
+    } catch (error: any) {
       toast({
         title: "Registration failed",
-        description: "Please try again or use a different email.",
+        description: error.message || "Please try again or use a different email.",
         variant: "destructive",
       });
     } finally {
@@ -50,23 +55,22 @@ const Register = () => {
     setIsLoading(true);
     
     try {
-      // TODO: Replace with Supabase Google OAuth
-      // Mock successful registration for now
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      toast({
-        title: "Registration successful",
-        description: "Welcome to ScamFT!",
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/`
+        }
       });
       
-      navigate("/");
-    } catch (error) {
+      if (error) throw error;
+      
+      // The redirect is handled by Supabase
+    } catch (error: any) {
       toast({
         title: "Google registration failed",
-        description: "Please try again or use email registration.",
+        description: error.message || "Please try again or use email registration.",
         variant: "destructive",
       });
-    } finally {
       setIsLoading(false);
     }
   };
@@ -149,6 +153,21 @@ const Register = () => {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="username">Username (optional)</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="username"
+                    type="text"
+                    placeholder="johndoe"
+                    className="pl-10"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
                   />
                 </div>
               </div>

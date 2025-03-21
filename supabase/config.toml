@@ -1,1 +1,14 @@
+
 project_id = "ntmogcnenelmbggucipy"
+
+[functions.create-checkout]
+verify_jwt = true
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.generate-embedding]
+verify_jwt = true
+
+[functions.search-nfts]
+verify_jwt = false
