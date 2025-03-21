@@ -52,10 +52,10 @@ const Hero = () => {
         </div>
       )}
       
-      <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-20 md:pt-36 md:pb-24 min-h-[80vh] flex flex-col justify-center">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          {/* Text Content */}
-          <div className="space-y-6 max-w-xl">
+      <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-16 min-h-[75vh]">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
+          {/* Text Content - Now taking 3 columns and aligned to top */}
+          <div className="lg:col-span-3 space-y-6">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -91,14 +91,35 @@ const Hero = () => {
                 <Link to="/about">Learn More</Link>
               </Button>
             </motion.div>
+            
+            {/* Stats Section - Moved up to be part of the text section */}
+            <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {[
+                { label: "Artists", value: "3.2K+" },
+                { label: "Artworks", value: "12K+" },
+                { label: "Sales", value: "$8.2M+" },
+                { label: "Community", value: "15K+" },
+              ].map((stat, index) => (
+                <motion.div
+                  key={stat.label}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: 0.3 + index * 0.1, ease: "easeOut" }}
+                  className="text-center"
+                >
+                  <div className="font-medium text-xl sm:text-2xl">{stat.value}</div>
+                  <div className="text-muted-foreground text-sm">{stat.label}</div>
+                </motion.div>
+              ))}
+            </div>
           </div>
           
-          {/* Featured NFT Display */}
+          {/* Featured NFT Display - Now smaller (2 columns) */}
           <motion.div
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-            className="relative"
+            className="relative lg:col-span-2"
           >
             {currentNFT && (
               <div className="glass rounded-2xl overflow-hidden shadow-xl">
@@ -108,24 +129,24 @@ const Hero = () => {
                   className="aspect-square w-full object-cover"
                 />
                 
-                <div className="p-6">
+                <div className="p-4">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h3 className="font-medium text-xl">{currentNFT.title}</h3>
+                      <h3 className="font-medium text-lg">{currentNFT.title}</h3>
                       <div className="flex items-center mt-1">
                         <img 
                           src={currentNFT.creator.avatar} 
                           alt={currentNFT.creator.name}
-                          className="w-6 h-6 rounded-full mr-2"
+                          className="w-5 h-5 rounded-full mr-2"
                         />
-                        <span className="text-sm text-muted-foreground">
+                        <span className="text-xs text-muted-foreground">
                           {currentNFT.creator.name}
                         </span>
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-sm text-muted-foreground">Current Price</div>
-                      <div className="font-medium">{currentNFT.price} ETH</div>
+                      <div className="text-xs text-muted-foreground">Price</div>
+                      <div className="font-medium text-sm">{currentNFT.price} ETH</div>
                     </div>
                   </div>
                 </div>
@@ -133,13 +154,13 @@ const Hero = () => {
             )}
             
             {/* Carousel Indicators */}
-            <div className="flex justify-center space-x-2 mt-6">
+            <div className="flex justify-center space-x-2 mt-3">
               {featuredNFTs.map((_, index) => (
                 <button
                   key={index}
                   className={`w-2 h-2 rounded-full transition-all duration-300 ${
                     index === currentIndex 
-                      ? "bg-primary w-6" 
+                      ? "bg-primary w-4" 
                       : "bg-muted-foreground/30 hover:bg-muted-foreground/50"
                   }`}
                   onClick={() => setCurrentIndex(index)}
@@ -148,27 +169,6 @@ const Hero = () => {
               ))}
             </div>
           </motion.div>
-        </div>
-        
-        {/* Stats Section */}
-        <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-8">
-          {[
-            { label: "Artists", value: "3.2K+" },
-            { label: "Artworks", value: "12K+" },
-            { label: "Sales", value: "$8.2M+" },
-            { label: "Community", value: "15K+" },
-          ].map((stat, index) => (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 + index * 0.1, ease: "easeOut" }}
-              className="text-center"
-            >
-              <div className="font-medium text-2xl sm:text-3xl">{stat.value}</div>
-              <div className="text-muted-foreground mt-1">{stat.label}</div>
-            </motion.div>
-          ))}
         </div>
       </div>
     </section>

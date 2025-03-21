@@ -26,13 +26,10 @@ const Index = () => {
         {/* Hero Section */}
         <Hero />
         
-        {/* Featured NFTs */}
-        <FeaturedNFTs />
-        
-        {/* How It Works Section */}
+        {/* How It Works Section - Moved up to be right after Hero */}
         <section className="page-section bg-gradient-to-b from-background to-secondary/30">
           <div className="page-container">
-            <div className="text-center max-w-3xl mx-auto mb-16">
+            <div className="text-left max-w-3xl mb-12">
               <motion.h2 
                 className="section-title"
                 initial={{ opacity: 0, y: 10 }}
@@ -43,7 +40,7 @@ const Index = () => {
                 How ScamFT Works
               </motion.h2>
               <motion.p 
-                className="section-description mx-auto"
+                className="section-description"
                 initial={{ opacity: 0, y: 10 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
@@ -105,6 +102,9 @@ const Index = () => {
             </div>
           </div>
         </section>
+        
+        {/* Featured NFTs */}
+        <FeaturedNFTs />
         
         {/* CTA Banner */}
         <section className="page-section">
