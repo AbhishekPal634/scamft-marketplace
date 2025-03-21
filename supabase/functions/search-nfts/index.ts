@@ -4,7 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const openaiApiKey = Deno.env.get("OPENAI_API_KEY") || "";
+const geminiApiKey = Deno.env.get("GEMINI_API_KEY") || "";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -31,33 +31,34 @@ serve(async (req) => {
       );
     }
 
-    if (!openaiApiKey) {
+    if (!geminiApiKey) {
       return new Response(
-        JSON.stringify({ error: "OpenAI API key not configured" }),
+        JSON.stringify({ error: "Gemini API key not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Generate embeddings for the search query
-    const embeddingResponse = await fetch("https://api.openai.com/v1/embeddings", {
+    // Generate embeddings for the search query using Gemini
+    const embeddingResponse = await fetch(`https://generativelanguage.googleapis.com/v1/models/embedding-001:embedContent?key=${geminiApiKey}`, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${openaiApiKey}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "text-embedding-3-small",
-        input: query.substring(0, 8191) // OpenAI limit
+        model: "embedding-001",
+        content: {
+          parts: [{ text: query.substring(0, 8191) }] // Text limit
+        }
       })
     });
 
     if (!embeddingResponse.ok) {
       const errorData = await embeddingResponse.json();
-      throw new Error(`OpenAI API error: ${JSON.stringify(errorData)}`);
+      throw new Error(`Gemini API error: ${JSON.stringify(errorData)}`);
     }
 
-    const { data } = await embeddingResponse.json();
-    const [{ embedding }] = data;
+    const data = await embeddingResponse.json();
+    const embedding = data.embedding.values;
 
     // Call the match_nfts function
     const { data: nfts, error } = await supabase.rpc(

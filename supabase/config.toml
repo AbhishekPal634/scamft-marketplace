@@ -12,3 +12,9 @@ verify_jwt = true
 
 [functions.search-nfts]
 verify_jwt = false
+
+[functions.generate-nft-image]
+verify_jwt = false
+
+[functions.seed-nfts]
+verify_jwt = true

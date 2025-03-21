@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { NFT } from "@/services/nftService";
+import { toast } from "@/components/ui/use-toast";
 
 export const useSearch = () => {
   const [results, setResults] = useState<NFT[]>([]);
@@ -29,7 +30,13 @@ export const useSearch = () => {
       setResults(data?.results || []);
     } catch (err: any) {
       console.error("Search error:", err);
-      setError(err.message || "Failed to search NFTs");
+      const errorMessage = err.message || "Failed to search NFTs";
+      setError(errorMessage);
+      toast({
+        title: "Search Failed",
+        description: errorMessage,
+        variant: "destructive"
+      });
       setResults([]);
     } finally {
       setIsLoading(false);
