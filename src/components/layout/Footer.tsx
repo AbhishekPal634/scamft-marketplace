@@ -1,6 +1,6 @@
 
 import { Link } from "react-router-dom";
-import { Twitter, Instagram, GitHub, ExternalLink } from "lucide-react";
+import { Twitter, Instagram, Github, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
@@ -39,7 +39,7 @@ const Footer = () => {
                 <Instagram className="h-4 w-4" />
               </Button>
               <Button variant="ghost" size="icon" className="rounded-full h-8 w-8">
-                <GitHub className="h-4 w-4" />
+                <Github className="h-4 w-4" />
               </Button>
             </div>
           </div>
