@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
@@ -25,9 +25,32 @@ const Checkout = () => {
   const { items, getTotal, clearCart } = useCartStore();
   const { toast } = useToast();
   
-  const [paymentMethod, setPaymentMethod] = useState<string>("wallet");
+  const [paymentMethod, setPaymentMethod] = useState<string>("card");
   const [processing, setProcessing] = useState<boolean>(false);
   const [completed, setCompleted] = useState<boolean>(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  
+  // Check authentication status
+  useEffect(() => {
+    // This will be replaced with actual auth check when Supabase is integrated
+    const checkAuth = async () => {
+      // Mock authentication check - will be replaced with Supabase auth
+      const mockIsAuthenticated = false;
+      setIsAuthenticated(mockIsAuthenticated);
+      
+      if (!mockIsAuthenticated) {
+        toast({
+          title: "Authentication required",
+          description: "Please sign in to complete your purchase",
+          variant: "destructive"
+        });
+        // Redirect to login after a short delay
+        setTimeout(() => navigate("/login"), 2000);
+      }
+    };
+    
+    checkAuth();
+  }, [navigate, toast]);
   
   // If cart is empty, redirect to cart page
   if (items.length === 0 && !completed) {
@@ -42,6 +65,17 @@ const Checkout = () => {
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Prevent checkout if not authenticated
+    if (!isAuthenticated) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to complete your purchase",
+        variant: "destructive"
+      });
+      navigate("/login");
+      return;
+    }
     
     // Show processing state
     setProcessing(true);
@@ -129,24 +163,11 @@ const Checkout = () => {
                     <h2 className="text-lg font-medium">Payment Method</h2>
                     
                     <RadioGroup 
-                      defaultValue="wallet" 
+                      defaultValue="card" 
                       value={paymentMethod}
                       onValueChange={setPaymentMethod}
                       className="space-y-3"
                     >
-                      <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-secondary/20 transition-colors cursor-pointer">
-                        <RadioGroupItem value="wallet" id="wallet" />
-                        <Label htmlFor="wallet" className="flex items-center cursor-pointer flex-1">
-                          <WalletCards className="h-5 w-5 mr-3 text-primary" />
-                          <div>
-                            <div>Crypto Wallet</div>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              Connect with MetaMask or another web3 wallet
-                            </div>
-                          </div>
-                        </Label>
-                      </div>
-                      
                       <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-secondary/20 transition-colors cursor-pointer">
                         <RadioGroupItem value="card" id="card" />
                         <Label htmlFor="card" className="flex items-center cursor-pointer flex-1">
@@ -155,6 +176,19 @@ const Checkout = () => {
                             <div>Credit / Debit Card</div>
                             <div className="text-xs text-muted-foreground mt-1">
                               Pay with Visa, Mastercard, or American Express
+                            </div>
+                          </div>
+                        </Label>
+                      </div>
+                      
+                      <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-secondary/20 transition-colors cursor-pointer">
+                        <RadioGroupItem value="wallet" id="wallet" />
+                        <Label htmlFor="wallet" className="flex items-center cursor-pointer flex-1">
+                          <WalletCards className="h-5 w-5 mr-3 text-primary" />
+                          <div>
+                            <div>Crypto Wallet</div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Connect with MetaMask or another web3 wallet
                             </div>
                           </div>
                         </Label>
@@ -246,7 +280,7 @@ const Checkout = () => {
                         </div>
                       </div>
                       <div className="text-right">
-                        {(item.nft.price * item.quantity).toFixed(4)} ETH
+                        ${(item.nft.price * item.quantity).toFixed(2)}
                       </div>
                     </div>
                   ))}
@@ -258,12 +292,12 @@ const Checkout = () => {
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span>{subtotal.toFixed(4)} ETH</span>
+                    <span>${subtotal.toFixed(2)}</span>
                   </div>
                   
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Service Fee (2.5%)</span>
-                    <span>{serviceFee.toFixed(4)} ETH</span>
+                    <span>${serviceFee.toFixed(2)}</span>
                   </div>
                   
                   <Separator className="my-2" />
@@ -271,10 +305,7 @@ const Checkout = () => {
                   <div className="flex justify-between font-medium">
                     <span>Total</span>
                     <div className="text-right">
-                      <div>{total.toFixed(4)} ETH</div>
-                      <div className="text-xs text-muted-foreground">
-                        ≈ ${(total * 2150).toFixed(2)} USD
-                      </div>
+                      <div>${total.toFixed(2)}</div>
                     </div>
                   </div>
                 </div>

@@ -76,9 +76,9 @@ const CartItem = ({ item, onRemove, onUpdateQuantity }: CartItemProps) => {
       {/* Quantity Controls */}
       <div className="flex flex-col items-end justify-between">
         <div className="text-right">
-          <div className="font-medium">{item.nft.price} ETH</div>
+          <div className="font-medium">${item.nft.price.toFixed(2)}</div>
           <div className="text-xs text-muted-foreground">
-            ≈ ${(item.nft.price * item.quantity * 2150).toFixed(2)}
+            Total: ${(item.nft.price * item.quantity).toFixed(2)}
           </div>
         </div>
         

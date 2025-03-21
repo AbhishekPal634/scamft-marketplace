@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -110,12 +109,12 @@ const Cart = () => {
         <div className="space-y-2">
           <div className="flex justify-between">
             <span className="text-muted-foreground">Subtotal</span>
-            <span>{subtotal.toFixed(4)} ETH</span>
+            <span>${subtotal.toFixed(2)}</span>
           </div>
           
           <div className="flex justify-between">
             <span className="text-muted-foreground">Service Fee (2.5%)</span>
-            <span>{serviceFee.toFixed(4)} ETH</span>
+            <span>${serviceFee.toFixed(2)}</span>
           </div>
           
           <Separator className="my-3" />
@@ -123,8 +122,7 @@ const Cart = () => {
           <div className="flex justify-between font-medium">
             <span>Total</span>
             <div className="text-right">
-              <div>{total.toFixed(4)} ETH</div>
-              <div className="text-xs text-muted-foreground">≈ ${(total * 2150).toFixed(2)} USD</div>
+              <div>${total.toFixed(2)}</div>
             </div>
           </div>
         </div>
@@ -149,7 +147,7 @@ const Cart = () => {
         </Button>
         
         <p className="text-xs text-center text-muted-foreground mt-4">
-          Secure checkout powered by Ethereum blockchain. All transactions are final.
+          Secure checkout powered by our payment processor. All transactions are final.
         </p>
       </div>
     </motion.div>

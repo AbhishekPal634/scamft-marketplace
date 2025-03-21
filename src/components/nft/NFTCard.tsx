@@ -135,7 +135,7 @@ const NFTCard = ({ nft, minimal = false }: NFTCardProps) => {
             
             <div className="text-right">
               <div className="text-xs text-muted-foreground">Price</div>
-              <div className="font-medium">{nft.price} ETH</div>
+              <div className="font-medium">${nft.price.toFixed(2)}</div>
             </div>
           </div>
           
