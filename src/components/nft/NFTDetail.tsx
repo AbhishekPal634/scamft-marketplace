@@ -17,7 +17,7 @@ const NFTDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { nfts, isLoading } = useNFTStore();
+  const { nfts, loading } = useNFTStore();
   const { addItem } = useCartStore();
   const { user } = useAuth();
   
@@ -32,7 +32,6 @@ const NFTDetail = () => {
       if (foundNFT) {
         setNft(foundNFT);
       } else {
-        // NFT not found, redirect to 404
         navigate("/404");
       }
     }
@@ -43,7 +42,6 @@ const NFTDetail = () => {
     
     setIsAddingToCart(true);
     
-    // Simulate API call delay
     setTimeout(() => {
       addItem(nft);
       
@@ -75,7 +73,6 @@ const NFTDetail = () => {
         url: window.location.href,
       }).catch(console.error);
     } else {
-      // Fallback for browsers that don't support the Web Share API
       navigator.clipboard.writeText(window.location.href);
       
       toast({
@@ -88,7 +85,6 @@ const NFTDetail = () => {
   const handleDownload = async () => {
     if (!nft) return;
     
-    // Check if user is authenticated
     if (!user) {
       toast({
         title: "Authentication required",
@@ -102,15 +98,10 @@ const NFTDetail = () => {
     setIsDownloading(true);
     
     try {
-      // In a real app, you would check if the user has purchased this NFT
-      // For now, we'll just simulate a download
-      
-      // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Download the image
       const link = document.createElement('a');
-      link.href = nft.image;
+      link.href = nft.image || nft.image_url || "";
       link.download = `${nft.title.replace(/\s+/g, '-').toLowerCase()}.jpg`;
       document.body.appendChild(link);
       link.click();
@@ -131,7 +122,7 @@ const NFTDetail = () => {
     }
   };
   
-  if (isLoading || !nft) {
+  if (loading || !nft) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -141,7 +132,6 @@ const NFTDetail = () => {
   
   return (
     <div className="page-container pt-28 pb-16">
-      {/* Back Button */}
       <button
         onClick={() => navigate(-1)}
         className="flex items-center text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors"
@@ -151,7 +141,6 @@ const NFTDetail = () => {
       </button>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
-        {/* NFT Image */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -159,14 +148,13 @@ const NFTDetail = () => {
         >
           <div className="glass rounded-2xl overflow-hidden">
             <BlurImage
-              src={nft.image}
+              src={nft.image || nft.image_url || ""}
               alt={nft.title}
               className="w-full aspect-square object-cover"
             />
           </div>
         </motion.div>
         
-        {/* NFT Details */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -179,12 +167,12 @@ const NFTDetail = () => {
                 <h1 className="text-3xl font-medium">{nft.title}</h1>
                 <div className="flex items-center mt-2">
                   <img 
-                    src={nft.creator.avatar} 
-                    alt={nft.creator.name}
+                    src={nft.creator?.avatar || "https://i.pravatar.cc/150?img=1"} 
+                    alt={nft.creator?.name || "Creator"}
                     className="w-6 h-6 rounded-full mr-2"
                   />
                   <span className="text-sm text-muted-foreground">
-                    Created by <span className="text-foreground">{nft.creator.name}</span>
+                    Created by <span className="text-foreground">{nft.creator?.name || "Artist"}</span>
                   </span>
                 </div>
               </div>
@@ -233,7 +221,6 @@ const NFTDetail = () => {
           
           <Separator />
           
-          {/* Price and Purchase */}
           <div className="glass rounded-xl p-4">
             <div className="flex justify-between items-center">
               <div>
@@ -273,7 +260,6 @@ const NFTDetail = () => {
             </div>
           </div>
           
-          {/* Tabs for Description, Details, etc. */}
           <Tabs defaultValue="description" className="mt-6">
             <TabsList>
               <TabsTrigger value="description">Description</TabsTrigger>
@@ -316,13 +302,13 @@ const NFTDetail = () => {
                 <div className="p-4 flex justify-between items-center">
                   <div className="flex items-center">
                     <img 
-                      src={nft.creator.avatar} 
-                      alt={nft.creator.name}
+                      src={nft.creator?.avatar || "https://i.pravatar.cc/150?img=1"} 
+                      alt={nft.creator?.name || "Creator"}
                       className="w-8 h-8 rounded-full mr-3"
                     />
                     <div>
                       <div className="font-medium">Minted</div>
-                      <div className="text-sm text-muted-foreground">by {nft.creator.name}</div>
+                      <div className="text-sm text-muted-foreground">by {nft.creator?.name || "Artist"}</div>
                     </div>
                   </div>
                   <div className="text-right">
@@ -352,7 +338,6 @@ const NFTDetail = () => {
         </motion.div>
       </div>
       
-      {/* Related NFTs */}
       <div className="mt-16">
         <h2 className="text-2xl font-medium mb-6">More like this</h2>
         <RelatedNFTs currentNftId={nft.id} tags={nft.tags || []} />

@@ -19,12 +19,28 @@ interface Profile {
   avatar_url: string;
 }
 
+interface SupabaseNFT {
+  id: string;
+  title: string;
+  description: string | null;
+  price: number;
+  image_url: string;
+  category: string | null;
+  tags: string[] | null;
+  created_at: string | null;
+  editions_total: number | null;
+  editions_available: number | null;
+  likes: number | null;
+  views: number | null;
+  creator_id: string | null;
+}
+
 interface PurchaseItem {
   id: string;
   nft_id: string;
   price_per_item: number;
   quantity: number;
-  nft: NFT;
+  nft: SupabaseNFT;
 }
 
 interface Purchase {
@@ -50,6 +66,35 @@ const Profile = () => {
       fetchUserPurchases();
     }
   }, [user]);
+
+  // Helper function to map Supabase NFT to frontend NFT model
+  const mapSupabaseNFTtoModel = (supabaseNFT: SupabaseNFT): NFT => {
+    return {
+      id: supabaseNFT.id,
+      title: supabaseNFT.title,
+      description: supabaseNFT.description || "",
+      price: supabaseNFT.price,
+      image: supabaseNFT.image_url,
+      image_url: supabaseNFT.image_url, // Keep this for compatibility
+      category: (supabaseNFT.category as "art" | "photography" | "music" | "video" | "collectible") || "art",
+      tags: supabaseNFT.tags || [],
+      createdAt: supabaseNFT.created_at || new Date().toISOString(),
+      created_at: supabaseNFT.created_at, // Keep this for compatibility
+      editions: {
+        total: supabaseNFT.editions_total || 1,
+        available: supabaseNFT.editions_available || 0
+      },
+      editions_total: supabaseNFT.editions_total, // Keep this for compatibility
+      editions_available: supabaseNFT.editions_available, // Keep this for compatibility
+      likes: supabaseNFT.likes || 0,
+      views: supabaseNFT.views || 0,
+      creator: {
+        id: supabaseNFT.creator_id || "unknown",
+        name: "Artist", // Default value, ideally you'd fetch the creator name
+        avatar: "https://i.pravatar.cc/150?img=1" // Default avatar
+      }
+    };
+  };
 
   const fetchProfile = async () => {
     try {
@@ -96,15 +141,17 @@ const Profile = () => {
         const nftIds = [...new Set(purchaseItems.map(item => item.nft_id))];
         
         // Fetch the actual NFT data
-        const { data: nfts, error: nftsError } = await supabase
+        const { data: nftsData, error: nftsError } = await supabase
           .from("nfts")
           .select("*")
           .in("id", nftIds);
 
         if (nftsError) throw nftsError;
         
-        if (nfts) {
-          setUserNFTs(nfts);
+        if (nftsData) {
+          // Map Supabase NFTs to our frontend model
+          const mappedNFTs = nftsData.map(nft => mapSupabaseNFTtoModel(nft));
+          setUserNFTs(mappedNFTs);
         }
       } else {
         setUserNFTs([]);
@@ -172,7 +219,7 @@ const Profile = () => {
     try {
       // In a real app, you might generate and download a certificate or token
       // Here we'll just download the image
-      const image = nft.image_url;
+      const image = nft.image_url || nft.image;
       const link = document.createElement('a');
       link.href = image;
       link.download = `${nft.title.replace(/\s+/g, '-').toLowerCase()}.jpg`;

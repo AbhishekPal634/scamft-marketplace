@@ -1,8 +1,9 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { corsHeaders } from "../_shared/cors.ts";
 
-const BATCH_SIZE = 20; // Process NFTs in smaller batches to avoid timeout
+const BATCH_SIZE = 5; // Process NFTs in smaller batches to avoid timeout
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -17,6 +18,13 @@ serve(async (req) => {
       {
         global: {
           headers: { Authorization: req.headers.get("Authorization")! },
+        },
+        auth: {
+          persistSession: false,
+        },
+        // Increase timeout to prevent 504 Gateway Timeout
+        db: {
+          schema: "public",
         },
       }
     );
@@ -38,7 +46,7 @@ serve(async (req) => {
       console.log("Existing NFTs cleared successfully");
     }
 
-    // Process NFTs in batches to avoid timeout
+    // Process NFTs in smaller batches to avoid timeout and add a longer delay between batches
     const results = [];
     for (let i = 0; i < nfts.length; i += BATCH_SIZE) {
       const batch = nfts.slice(i, i + BATCH_SIZE);
@@ -56,9 +64,10 @@ serve(async (req) => {
       results.push(...(data || []));
       console.log(`Batch ${i / BATCH_SIZE + 1} processed successfully`);
       
-      // Add a small delay between batches to avoid rate limiting
+      // Add a longer delay between batches to avoid rate limiting and timeout issues
       if (i + BATCH_SIZE < nfts.length) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        console.log(`Waiting 1 second before processing next batch...`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
 

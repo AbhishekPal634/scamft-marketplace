@@ -23,6 +23,12 @@ export interface NFT {
   views: number;
   isLiked?: boolean;
   embedding?: number[]; // Vector embedding for similar search
+  
+  // Add properties to match Supabase schema - these will be used for mapping
+  image_url?: string;
+  created_at?: string;
+  editions_total?: number;
+  editions_available?: number;
 }
 
 // Sample NFT data with embeddings (simplified)
@@ -208,7 +214,8 @@ const sampleNFTs: NFT[] = [
 interface NFTStore {
   nfts: NFT[];
   featured: NFT[];
-  loading: boolean;
+  loading: boolean; // Already existed
+  isLoading: boolean; // Added to match usage in components
   fetchNFTs: () => Promise<NFT[]>;
   getNFTById: (id: string) => NFT | undefined;
   toggleLike: (id: string) => void;
@@ -228,9 +235,10 @@ export const useNFTStore = create<NFTStore>((set, get) => ({
   nfts: [],
   featured: [],
   loading: false,
+  isLoading: false, // Add this property to match usage in components
   
   fetchNFTs: async () => {
-    set({ loading: true });
+    set({ loading: true, isLoading: true });
     
     // Simulate API call delay
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -239,7 +247,8 @@ export const useNFTStore = create<NFTStore>((set, get) => ({
     set({ 
       nfts: sampleNFTs,
       featured: sampleNFTs.slice(0, 4),
-      loading: false 
+      loading: false,
+      isLoading: false
     });
     
     return sampleNFTs;
