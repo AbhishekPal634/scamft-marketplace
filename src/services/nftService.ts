@@ -19,6 +19,7 @@ export interface NFT {
   description: string;
   price: number;
   image: string;
+  image_url?: string; // Add this for backward compatibility
   creator: Creator;
   createdAt: string;
   tags: string[];
@@ -27,6 +28,15 @@ export interface NFT {
   likes: number;
   views: number;
   isLiked: boolean;
+  embedding?: number[]; // Add embedding property for vector search
+}
+
+export interface NFTFilters {
+  category?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  tags?: string[];
+  sortBy?: 'recent' | 'price_asc' | 'price_desc' | 'popular';
 }
 
 export interface Purchase {
@@ -56,6 +66,7 @@ const mapDbNftToNft = (dbNft: any): NFT => {
     description: dbNft.description || '',
     price: parseFloat(dbNft.price) || 0,
     image: dbNft.image_url || '/placeholder.svg',
+    image_url: dbNft.image_url || '/placeholder.svg', // Keep both for compatibility
     creator: {
       id: dbNft.creator_id || '0',
       name: 'Unknown Artist', // You might want to fetch this from profiles table
@@ -71,6 +82,7 @@ const mapDbNftToNft = (dbNft: any): NFT => {
     likes: dbNft.likes || 0,
     views: dbNft.views || 0,
     isLiked: false, // You might want to fetch this from a user_likes table
+    embedding: dbNft.embedding ? JSON.parse(dbNft.embedding) : undefined,
   };
 };
 
@@ -96,15 +108,22 @@ const mapDbPurchaseToFrontend = (purchase: any, purchaseItems: any[]): Purchase 
 export interface NFTStore {
   nfts: NFT[];
   isLoading: boolean;
+  loading: boolean; // Alias for isLoading for backward compatibility
   fetchNFTs: () => Promise<NFT[]>;
   toggleLike: (id: string) => void;
   getUserPurchases: (userId: string) => Promise<Purchase[]>;
   getUserNfts: (userId: string) => Promise<NFT[]>;
+  filterNFTs: (filters: NFTFilters) => NFT[]; // Add filterNFTs method
+  getNFTById: (id: string) => NFT | undefined; // Add getNFTById method
 }
 
 export const useNFTStore = create<NFTStore>((set, get) => ({
   nfts: [],
   isLoading: false,
+  // Alias loading to isLoading for backward compatibility
+  get loading() {
+    return get().isLoading;
+  },
   
   fetchNFTs: async () => {
     try {
@@ -231,5 +250,61 @@ export const useNFTStore = create<NFTStore>((set, get) => ({
       console.error('Error fetching user NFTs:', error);
       return [];
     }
+  },
+
+  // Add the filterNFTs method
+  filterNFTs: (filters: NFTFilters) => {
+    const { nfts } = get();
+    
+    let filteredNfts = [...nfts];
+    
+    // Filter by category
+    if (filters.category && filters.category !== 'all') {
+      filteredNfts = filteredNfts.filter(nft => 
+        nft.category.toLowerCase() === filters.category!.toLowerCase()
+      );
+    }
+    
+    // Filter by price range
+    if (filters.minPrice !== undefined) {
+      filteredNfts = filteredNfts.filter(nft => nft.price >= filters.minPrice!);
+    }
+    
+    if (filters.maxPrice !== undefined) {
+      filteredNfts = filteredNfts.filter(nft => nft.price <= filters.maxPrice!);
+    }
+    
+    // Filter by tags
+    if (filters.tags && filters.tags.length > 0) {
+      filteredNfts = filteredNfts.filter(nft => 
+        nft.tags.some(tag => filters.tags!.includes(tag))
+      );
+    }
+    
+    // Sort
+    if (filters.sortBy) {
+      switch (filters.sortBy) {
+        case 'recent':
+          filteredNfts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          break;
+        case 'price_asc':
+          filteredNfts.sort((a, b) => a.price - b.price);
+          break;
+        case 'price_desc':
+          filteredNfts.sort((a, b) => b.price - a.price);
+          break;
+        case 'popular':
+          filteredNfts.sort((a, b) => b.likes - a.likes);
+          break;
+      }
+    }
+    
+    return filteredNfts;
+  },
+
+  // Add the getNFTById method
+  getNFTById: (id: string) => {
+    const { nfts } = get();
+    return nfts.find(nft => nft.id === id);
   }
 }));
