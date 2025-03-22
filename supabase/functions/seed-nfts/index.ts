@@ -30,18 +30,22 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+    // Create a Supabase client with the service role key
+    // This allows us to bypass RLS policies
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    
+    // Check if the service role key is available
+    if (!supabaseServiceKey) {
+      throw new Error("SUPABASE_SERVICE_ROLE_KEY is not available in environment variables");
+    }
+    
+    const supabaseAdmin = createClient(
+      supabaseUrl,
+      supabaseServiceKey,
       {
-        global: {
-          headers: { Authorization: req.headers.get("Authorization")! },
-        },
         auth: {
           persistSession: false,
-        },
-        db: {
-          schema: "public",
         },
       }
     );
@@ -95,7 +99,7 @@ serve(async (req) => {
     // Check if we need to clear existing NFTs
     if (clearExisting) {
       console.log("Clearing existing NFTs...");
-      const { error: deleteError } = await supabaseClient
+      const { error: deleteError } = await supabaseAdmin
         .from("nfts")
         .delete()
         .neq("id", "00000000-0000-0000-0000-000000000000"); // Safety check to avoid deleting everything
@@ -109,7 +113,7 @@ serve(async (req) => {
     // Process NFTs in small batches
     console.log(`Processing batch of ${nftsToProcess.length} NFTs starting at index ${startIndex}`);
     
-    const { data, error } = await supabaseClient
+    const { data, error } = await supabaseAdmin
       .from("nfts")
       .insert(nftsToProcess)
       .select();
