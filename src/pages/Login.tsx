@@ -11,13 +11,12 @@ import { useToast } from "@/components/ui/use-toast";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const { signIn } = useAuth();
+  const { signIn, signInWithGoogle } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -54,16 +53,9 @@ const Login = () => {
     setIsLoading(true);
     
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/`
-        }
-      });
+      await signInWithGoogle();
       
-      if (error) throw error;
-      
-      // The redirect is handled by Supabase
+      // The redirect is handled by Supabase and our Auth context
     } catch (error: any) {
       toast({
         title: "Google login failed",

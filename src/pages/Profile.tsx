@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Loader2, User, Plus, Settings, ShoppingBag } from "lucide-react";
+import { Loader2, User, Plus, Settings, ShoppingBag, Download } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
@@ -19,17 +19,35 @@ interface Profile {
   avatar_url: string;
 }
 
+interface PurchaseItem {
+  id: string;
+  nft_id: string;
+  price_per_item: number;
+  quantity: number;
+  nft: NFT;
+}
+
+interface Purchase {
+  id: string;
+  created_at: string;
+  total_amount: number;
+  status: string;
+  items: PurchaseItem[];
+}
+
 const Profile = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [userNFTs, setUserNFTs] = useState<NFT[]>([]);
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (user) {
       fetchProfile();
       fetchUserNFTs();
+      fetchUserPurchases();
     }
   }, [user]);
 
@@ -60,11 +78,118 @@ const Profile = () => {
 
   const fetchUserNFTs = async () => {
     try {
-      // For now, use the mock NFTs
-      // In a real app, you would fetch from Supabase
-      setUserNFTs([]);
+      // Fetch NFTs that the user has purchased
+      const { data: purchaseItems, error } = await supabase
+        .from("purchase_items")
+        .select(`
+          id,
+          nft_id,
+          purchase:purchases(user_id, status)
+        `)
+        .eq("purchase.user_id", user?.id)
+        .eq("purchase.status", "completed");
+
+      if (error) throw error;
+
+      if (purchaseItems && purchaseItems.length > 0) {
+        // Extract unique NFT IDs
+        const nftIds = [...new Set(purchaseItems.map(item => item.nft_id))];
+        
+        // Fetch the actual NFT data
+        const { data: nfts, error: nftsError } = await supabase
+          .from("nfts")
+          .select("*")
+          .in("id", nftIds);
+
+        if (nftsError) throw nftsError;
+        
+        if (nfts) {
+          setUserNFTs(nfts);
+        }
+      } else {
+        setUserNFTs([]);
+      }
     } catch (error: any) {
-      console.error("Error fetching NFTs:", error.message);
+      console.error("Error fetching user NFTs:", error.message);
+      toast({
+        title: "Error fetching your NFTs",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const fetchUserPurchases = async () => {
+    try {
+      // Fetch all purchases by the user
+      const { data: purchasesData, error } = await supabase
+        .from("purchases")
+        .select("*")
+        .eq("user_id", user?.id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      if (purchasesData && purchasesData.length > 0) {
+        // For each purchase, fetch the related items
+        const purchasesWithItems = await Promise.all(
+          purchasesData.map(async (purchase) => {
+            const { data: items, error: itemsError } = await supabase
+              .from("purchase_items")
+              .select(`
+                id,
+                nft_id,
+                price_per_item,
+                quantity,
+                nft:nfts(*)
+              `)
+              .eq("purchase_id", purchase.id);
+
+            if (itemsError) throw itemsError;
+
+            return {
+              ...purchase,
+              items: items || [],
+            };
+          })
+        );
+
+        setPurchases(purchasesWithItems);
+      } else {
+        setPurchases([]);
+      }
+    } catch (error: any) {
+      console.error("Error fetching user purchases:", error.message);
+      toast({
+        title: "Error fetching your purchases",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDownloadNFT = async (nft: any) => {
+    try {
+      // In a real app, you might generate and download a certificate or token
+      // Here we'll just download the image
+      const image = nft.image_url;
+      const link = document.createElement('a');
+      link.href = image;
+      link.download = `${nft.title.replace(/\s+/g, '-').toLowerCase()}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: "NFT Downloaded",
+        description: `${nft.title} has been downloaded successfully.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Download Failed",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -152,24 +277,106 @@ const Profile = () => {
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                     {userNFTs.map((nft) => (
-                      <NFTCard key={nft.id} nft={nft} />
+                      <div key={nft.id} className="relative group">
+                        <NFTCard nft={nft} />
+                        <div className="absolute inset-0 bg-black/70 rounded-lg opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-200">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="rounded-full"
+                            onClick={() => handleDownloadNFT(nft)}
+                          >
+                            <Download className="mr-2 h-4 w-4" />
+                            Download
+                          </Button>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
               </TabsContent>
               
-              <TabsContent value="purchases" className="text-center py-12 glass rounded-lg">
-                <ShoppingBag className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-xl font-medium mb-2">No purchases yet</h3>
-                <p className="text-muted-foreground mb-6">
-                  Your purchase history will appear here once you buy NFTs.
-                </p>
-                <Button 
-                  className="rounded-full"
-                  onClick={() => location.href = "/explore"}
-                >
-                  Start Shopping
-                </Button>
+              <TabsContent value="purchases" className="space-y-6">
+                {purchases.length === 0 ? (
+                  <div className="text-center py-12 glass rounded-lg">
+                    <ShoppingBag className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-xl font-medium mb-2">No purchases yet</h3>
+                    <p className="text-muted-foreground mb-6">
+                      Your purchase history will appear here once you buy NFTs.
+                    </p>
+                    <Button 
+                      className="rounded-full"
+                      onClick={() => location.href = "/explore"}
+                    >
+                      Start Shopping
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-8">
+                    {purchases.map((purchase) => (
+                      <div key={purchase.id} className="glass rounded-xl overflow-hidden">
+                        <div className="bg-secondary/30 p-4 flex justify-between items-center">
+                          <div>
+                            <span className="text-xs text-muted-foreground">Order ID</span>
+                            <h3 className="font-medium">{purchase.id.split('-')[0]}...</h3>
+                          </div>
+                          <div>
+                            <span className="text-xs text-muted-foreground">Date</span>
+                            <p className="font-medium">
+                              {new Date(purchase.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-xs text-muted-foreground">Total</span>
+                            <p className="font-medium">${purchase.total_amount.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <span className={`px-2 py-1 rounded-full text-xs ${
+                              purchase.status === 'completed' 
+                                ? 'bg-green-500/10 text-green-500' 
+                                : 'bg-yellow-500/10 text-yellow-500'
+                            }`}>
+                              {purchase.status === 'completed' ? 'Completed' : 'Processing'}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <div className="p-4">
+                          <h4 className="text-sm font-medium mb-3">Items</h4>
+                          <div className="space-y-3">
+                            {purchase.items.map((item) => (
+                              <div key={item.id} className="flex items-center gap-4 p-2 rounded-lg hover:bg-secondary/20">
+                                <div className="h-12 w-12 rounded overflow-hidden">
+                                  <img 
+                                    src={item.nft?.image_url} 
+                                    alt={item.nft?.title || 'NFT'} 
+                                    className="h-full w-full object-cover"
+                                  />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h5 className="font-medium truncate">
+                                    {item.nft?.title || 'NFT'}
+                                  </h5>
+                                  <p className="text-xs text-muted-foreground">
+                                    Qty: {item.quantity} × ${item.price_per_item}
+                                  </p>
+                                </div>
+                                <Button 
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDownloadNFT(item.nft)}
+                                  className="rounded-full"
+                                >
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </TabsContent>
               
               <TabsContent value="favorites" className="text-center py-12 glass rounded-lg">

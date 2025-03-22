@@ -52,9 +52,9 @@ const Hero = () => {
         </div>
       )}
       
-      <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-16 min-h-[75vh]">
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
-          {/* Text Content - Now taking 3 columns and aligned to top */}
+      <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 min-h-[75vh] flex items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-center">
+          {/* Text Content - Now taking 3 columns and centered vertically */}
           <div className="lg:col-span-3 space-y-6">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
