@@ -1,336 +1,235 @@
 
-import { create } from "zustand";
+import { create } from 'zustand';
+import { supabase } from '@/integrations/supabase/client';
+
+export interface Creator {
+  id: string;
+  name: string;
+  avatar: string;
+}
+
+export interface NFTEditions {
+  total: number;
+  available: number;
+}
 
 export interface NFT {
   id: string;
   title: string;
   description: string;
   price: number;
-  creator: {
-    id: string;
-    name: string;
-    avatar: string;
-  };
   image: string;
-  category: "art" | "photography" | "music" | "video" | "collectible";
-  tags: string[];
+  creator: Creator;
   createdAt: string;
-  editions: {
-    total: number;
-    available: number;
-  };
+  tags: string[];
+  category: string;
+  editions: NFTEditions;
   likes: number;
   views: number;
-  isLiked?: boolean;
-  embedding?: number[]; // Vector embedding for similar search
-  
-  // Add properties to match Supabase schema - these will be used for mapping
-  image_url?: string;
-  created_at?: string;
-  editions_total?: number;
-  editions_available?: number;
+  isLiked: boolean;
 }
 
-// Sample NFT data with embeddings (simplified)
-const sampleNFTs: NFT[] = [
-  {
-    id: "nft-001",
-    title: "Cosmic Dreams #137",
-    description: "A journey through the cosmic dream landscape, where reality bends and new dimensions emerge.",
-    price: 0.5,
-    creator: {
-      id: "creator-1",
-      name: "NebulaArtist",
-      avatar: "https://i.pravatar.cc/150?img=1",
-    },
-    image: "https://images.unsplash.com/photo-1618005198919-d3d4b5a92ead?w=800&auto=format&fit=crop",
-    category: "art",
-    tags: ["abstract", "space", "colorful", "digital"],
-    createdAt: "2023-09-15T10:30:00Z",
-    editions: {
-      total: 10,
-      available: 3,
-    },
-    likes: 128,
-    views: 1452,
-    embedding: [0.2, 0.5, 0.3, 0.8, 0.1], // Simulated embedding
-  },
-  {
-    id: "nft-002",
-    title: "Digital Genesis",
-    description: "The birth of digital consciousness, represented through algorithmic patterns and emergent structures.",
-    price: 1.2,
-    creator: {
-      id: "creator-2",
-      name: "DigitalSculptor",
-      avatar: "https://i.pravatar.cc/150?img=2",
-    },
-    image: "https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?w=800&auto=format&fit=crop",
-    category: "art",
-    tags: ["generative", "algorithm", "procedural", "futuristic"],
-    createdAt: "2023-10-02T14:15:00Z",
-    editions: {
-      total: 5,
-      available: 2,
-    },
-    likes: 89,
-    views: 976,
-    embedding: [0.7, 0.2, 0.4, 0.1, 0.6], // Simulated embedding
-  },
-  {
-    id: "nft-003",
-    title: "Neon City Pulse",
-    description: "A cyberpunk vision of urban life, where technology and humanity intersect in a neon-lit metropolis.",
-    price: 0.75,
-    creator: {
-      id: "creator-3",
-      name: "CyberVisions",
-      avatar: "https://i.pravatar.cc/150?img=3",
-    },
-    image: "https://images.unsplash.com/photo-1558591710-4b4a1ae0f04d?w=800&auto=format&fit=crop",
-    category: "photography",
-    tags: ["cyberpunk", "city", "neon", "urban"],
-    createdAt: "2023-08-24T20:45:00Z",
-    editions: {
-      total: 15,
-      available: 7,
-    },
-    likes: 205,
-    views: 2341,
-    embedding: [0.4, 0.8, 0.1, 0.3, 0.5], // Simulated embedding
-  },
-  {
-    id: "nft-004",
-    title: "Quantum Fragments",
-    description: "Fragments of quantum reality brought together in a harmonious composition that transcends space and time.",
-    price: 1.8,
-    creator: {
-      id: "creator-4",
-      name: "QuantumArtist",
-      avatar: "https://i.pravatar.cc/150?img=4",
-    },
-    image: "https://images.unsplash.com/photo-1633107886062-42a83a574950?w=800&auto=format&fit=crop",
-    category: "art",
-    tags: ["quantum", "abstract", "fragmented", "digital art"],
-    createdAt: "2023-11-05T09:20:00Z",
-    editions: {
-      total: 8,
-      available: 1,
-    },
-    likes: 176,
-    views: 1823,
-    embedding: [0.3, 0.6, 0.9, 0.2, 0.4], // Simulated embedding
-  },
-  {
-    id: "nft-005",
-    title: "Ethereal Soundscape",
-    description: "A visual representation of sound, capturing the ethereal quality of a unique audio composition.",
-    price: 0.9,
-    creator: {
-      id: "creator-5",
-      name: "AudioVisualizer",
-      avatar: "https://i.pravatar.cc/150?img=5",
-    },
-    image: "https://images.unsplash.com/photo-1617791160505-6f00504e3519?w=800&auto=format&fit=crop",
-    category: "music",
-    tags: ["audio", "sound", "visualization", "ethereal"],
-    createdAt: "2023-10-20T15:30:00Z",
-    editions: {
-      total: 12,
-      available: 5,
-    },
-    likes: 143,
-    views: 1567,
-    embedding: [0.1, 0.3, 0.7, 0.9, 0.2], // Simulated embedding
-  },
-  {
-    id: "nft-006",
-    title: "Natural Algorithms",
-    description: "Patterns found in nature, recreated through algorithmic processes to reveal the mathematical beauty of our world.",
-    price: 0.65,
-    creator: {
-      id: "creator-6",
-      name: "NatureCode",
-      avatar: "https://i.pravatar.cc/150?img=6",
-    },
-    image: "https://images.unsplash.com/photo-1638803040283-7a5ffd48dad5?w=800&auto=format&fit=crop",
-    category: "art",
-    tags: ["nature", "algorithm", "patterns", "generative"],
-    createdAt: "2023-09-30T12:10:00Z",
-    editions: {
-      total: 20,
-      available: 11,
-    },
-    likes: 98,
-    views: 1089,
-    embedding: [0.8, 0.2, 0.4, 0.6, 0.3], // Simulated embedding
-  },
-  {
-    id: "nft-007",
-    title: "Retro Pixel Dreams",
-    description: "A nostalgic journey to the early days of digital art, celebrating pixel aesthetics with a modern twist.",
-    price: 0.4,
-    creator: {
-      id: "creator-7",
-      name: "PixelPioneer",
-      avatar: "https://i.pravatar.cc/150?img=7",
-    },
-    image: "https://images.unsplash.com/photo-1616509091023-c6cffc70daa7?w=800&auto=format&fit=crop",
-    category: "art",
-    tags: ["pixel", "retro", "8bit", "gaming"],
-    createdAt: "2023-11-12T16:40:00Z",
-    editions: {
-      total: 25,
-      available: 18,
-    },
-    likes: 112,
-    views: 1356,
-    embedding: [0.5, 0.9, 0.1, 0.4, 0.7], // Simulated embedding
-  },
-  {
-    id: "nft-008",
-    title: "Fluid Dynamics",
-    description: "Capturing the mesmerizing beauty of fluid motion in a frozen moment of digital perfection.",
-    price: 1.5,
-    creator: {
-      id: "creator-8",
-      name: "FlowStudio",
-      avatar: "https://i.pravatar.cc/150?img=8",
-    },
-    image: "https://images.unsplash.com/photo-1638803040283-7a5ffd48dad5?w=800&auto=format&fit=crop",
-    category: "art",
-    tags: ["fluid", "dynamic", "motion", "abstract"],
-    createdAt: "2023-10-08T08:50:00Z",
-    editions: {
-      total: 7,
-      available: 2,
-    },
-    likes: 167,
-    views: 1935,
-    embedding: [0.6, 0.2, 0.8, 0.3, 0.1], // Simulated embedding
-  },
-];
+export interface Purchase {
+  id: string;
+  user_id: string;
+  total_amount: number;
+  status: string;
+  created_at: string;
+  stripe_payment_id?: string;
+  items: PurchaseItem[];
+}
 
-interface NFTStore {
+export interface PurchaseItem {
+  id: string;
+  purchase_id: string;
+  nft_id: string;
+  quantity: number;
+  price_per_item: number;
+  nft: NFT;
+}
+
+// Map database NFT to frontend NFT model
+const mapDbNftToNft = (dbNft: any): NFT => {
+  return {
+    id: dbNft.id,
+    title: dbNft.title || 'Untitled NFT',
+    description: dbNft.description || '',
+    price: parseFloat(dbNft.price) || 0,
+    image: dbNft.image_url || '/placeholder.svg',
+    creator: {
+      id: dbNft.creator_id || '0',
+      name: 'Unknown Artist', // You might want to fetch this from profiles table
+      avatar: '/placeholder.svg', // Default avatar
+    },
+    createdAt: dbNft.created_at || new Date().toISOString(),
+    tags: dbNft.tags || [],
+    category: dbNft.category || 'Art',
+    editions: {
+      total: dbNft.editions_total || 1,
+      available: dbNft.editions_available || 1,
+    },
+    likes: dbNft.likes || 0,
+    views: dbNft.views || 0,
+    isLiked: false, // You might want to fetch this from a user_likes table
+  };
+};
+
+const mapDbPurchaseToFrontend = (purchase: any, purchaseItems: any[]): Purchase => {
+  return {
+    id: purchase.id,
+    user_id: purchase.user_id,
+    total_amount: parseFloat(purchase.total_amount) || 0,
+    status: purchase.status || 'completed',
+    created_at: purchase.created_at || new Date().toISOString(),
+    stripe_payment_id: purchase.stripe_payment_id,
+    items: purchaseItems.map(item => ({
+      id: item.id,
+      purchase_id: item.purchase_id,
+      nft_id: item.nft_id,
+      quantity: item.quantity || 1,
+      price_per_item: parseFloat(item.price_per_item) || 0,
+      nft: item.nft ? mapDbNftToNft(item.nft) : {} as NFT,
+    })),
+  };
+};
+
+export interface NFTStore {
   nfts: NFT[];
-  featured: NFT[];
-  loading: boolean; // Already existed
-  isLoading: boolean; // Added to match usage in components
+  isLoading: boolean;
   fetchNFTs: () => Promise<NFT[]>;
-  getNFTById: (id: string) => NFT | undefined;
   toggleLike: (id: string) => void;
-  searchNFTs: (query: string) => NFT[];
-  filterNFTs: (filters: NFTFilters) => NFT[];
-}
-
-export interface NFTFilters {
-  category?: string;
-  minPrice?: number;
-  maxPrice?: number;
-  tags?: string[];
-  sortBy?: "price_asc" | "price_desc" | "recent" | "popular";
+  getUserPurchases: (userId: string) => Promise<Purchase[]>;
+  getUserNfts: (userId: string) => Promise<NFT[]>;
 }
 
 export const useNFTStore = create<NFTStore>((set, get) => ({
   nfts: [],
-  featured: [],
-  loading: false,
-  isLoading: false, // Add this property to match usage in components
+  isLoading: false,
   
   fetchNFTs: async () => {
-    set({ loading: true, isLoading: true });
-    
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // In a real app, this would be a fetch request to your API
-    set({ 
-      nfts: sampleNFTs,
-      featured: sampleNFTs.slice(0, 4),
-      loading: false,
-      isLoading: false
-    });
-    
-    return sampleNFTs;
-  },
-  
-  getNFTById: (id: string) => {
-    return get().nfts.find(nft => nft.id === id);
+    try {
+      set({ isLoading: true });
+      
+      const { data: nftsData, error } = await supabase
+        .from('nfts')
+        .select('*')
+        .order('created_at', { ascending: false });
+        
+      if (error) {
+        console.error('Error fetching NFTs:', error);
+        throw error;
+      }
+      
+      const mappedNfts = nftsData.map(mapDbNftToNft);
+      set({ nfts: mappedNfts, isLoading: false });
+      return mappedNfts;
+    } catch (error) {
+      console.error('Error fetching NFTs:', error);
+      set({ isLoading: false });
+      return [];
+    }
   },
   
   toggleLike: (id: string) => {
-    set(state => ({
-      nfts: state.nfts.map(nft => 
-        nft.id === id 
-          ? { 
-              ...nft, 
-              isLiked: !nft.isLiked,
-              likes: nft.isLiked ? nft.likes - 1 : nft.likes + 1 
-            } 
-          : nft
-      )
-    }));
-  },
-  
-  searchNFTs: (query: string) => {
     const { nfts } = get();
-    if (!query.trim()) return nfts;
-    
-    const lowerQuery = query.toLowerCase();
-    
-    return nfts.filter(nft => 
-      nft.title.toLowerCase().includes(lowerQuery) ||
-      nft.description.toLowerCase().includes(lowerQuery) ||
-      nft.creator.name.toLowerCase().includes(lowerQuery) ||
-      nft.tags.some(tag => tag.toLowerCase().includes(lowerQuery))
-    );
-  },
-  
-  filterNFTs: (filters: NFTFilters) => {
-    const { nfts } = get();
-    let filtered = [...nfts];
-    
-    // Apply category filter
-    if (filters.category && filters.category !== "all") {
-      filtered = filtered.filter(nft => nft.category === filters.category);
-    }
-    
-    // Apply price filters
-    if (filters.minPrice !== undefined) {
-      filtered = filtered.filter(nft => nft.price >= filters.minPrice!);
-    }
-    
-    if (filters.maxPrice !== undefined) {
-      filtered = filtered.filter(nft => nft.price <= filters.maxPrice!);
-    }
-    
-    // Apply tag filters
-    if (filters.tags && filters.tags.length > 0) {
-      filtered = filtered.filter(nft => 
-        filters.tags!.some(tag => nft.tags.includes(tag))
-      );
-    }
-    
-    // Apply sorting
-    if (filters.sortBy) {
-      switch (filters.sortBy) {
-        case "price_asc":
-          filtered.sort((a, b) => a.price - b.price);
-          break;
-        case "price_desc":
-          filtered.sort((a, b) => b.price - a.price);
-          break;
-        case "recent":
-          filtered.sort((a, b) => 
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
-          break;
-        case "popular":
-          filtered.sort((a, b) => b.likes - a.likes);
-          break;
+    const updatedNfts = nfts.map((nft) => {
+      if (nft.id === id) {
+        const isLiked = !nft.isLiked;
+        const likesChange = isLiked ? 1 : -1;
+        
+        // In a real application, you would make an API call here
+        // to update the like status in the database
+        
+        return {
+          ...nft,
+          isLiked,
+          likes: nft.likes + likesChange,
+        };
       }
-    }
+      return nft;
+    });
     
-    return filtered;
+    set({ nfts: updatedNfts });
+  },
+  
+  getUserPurchases: async (userId: string) => {
+    try {
+      const { data: purchasesData, error: purchasesError } = await supabase
+        .from('purchases')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+        
+      if (purchasesError) {
+        console.error('Error fetching purchases:', purchasesError);
+        throw purchasesError;
+      }
+      
+      const purchases: Purchase[] = [];
+      
+      for (const purchase of purchasesData) {
+        const { data: itemsData, error: itemsError } = await supabase
+          .from('purchase_items')
+          .select('*, nft:nfts(*)')
+          .eq('purchase_id', purchase.id);
+          
+        if (itemsError) {
+          console.error('Error fetching purchase items:', itemsError);
+          continue;
+        }
+        
+        purchases.push(mapDbPurchaseToFrontend(purchase, itemsData));
+      }
+      
+      return purchases;
+    } catch (error) {
+      console.error('Error fetching user purchases:', error);
+      return [];
+    }
+  },
+  
+  getUserNfts: async (userId: string) => {
+    try {
+      // First get all purchase items for the user
+      const { data: purchases, error: purchasesError } = await supabase
+        .from('purchases')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('status', 'completed');
+        
+      if (purchasesError) {
+        console.error('Error fetching user purchases:', purchasesError);
+        throw purchasesError;
+      }
+      
+      if (purchases.length === 0) {
+        return [];
+      }
+      
+      const purchaseIds = purchases.map(p => p.id);
+      
+      const { data: purchaseItems, error: itemsError } = await supabase
+        .from('purchase_items')
+        .select('*, nft:nfts(*)')
+        .in('purchase_id', purchaseIds);
+        
+      if (itemsError) {
+        console.error('Error fetching purchase items:', itemsError);
+        throw itemsError;
+      }
+      
+      // Map and deduplicate NFTs
+      const nftMap = new Map<string, any>();
+      purchaseItems.forEach(item => {
+        if (item.nft && !nftMap.has(item.nft.id)) {
+          nftMap.set(item.nft.id, item.nft);
+        }
+      });
+      
+      return Array.from(nftMap.values()).map(mapDbNftToNft);
+    } catch (error) {
+      console.error('Error fetching user NFTs:', error);
+      return [];
+    }
   }
 }));

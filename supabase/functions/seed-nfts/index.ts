@@ -3,7 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { corsHeaders } from "../_shared/cors.ts";
 
-const BATCH_SIZE = 5; // Process NFTs in smaller batches to avoid timeout
+const BATCH_SIZE = 10; // Only process 10 NFTs at a time
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -22,7 +22,6 @@ serve(async (req) => {
         auth: {
           persistSession: false,
         },
-        // Increase timeout to prevent 504 Gateway Timeout
         db: {
           schema: "public",
         },
@@ -30,7 +29,31 @@ serve(async (req) => {
     );
 
     // Get the request body
-    const { nfts, clearExisting } = await req.json();
+    const { nfts, clearExisting, startIndex = 0, count = 10 } = await req.json();
+    
+    // If no NFTs are provided, return an error
+    if (!nfts || !Array.isArray(nfts)) {
+      throw new Error("No NFTs provided or invalid format");
+    }
+    
+    // Limit the number of NFTs to process to 10
+    const nftsToProcess = nfts.slice(startIndex, startIndex + count);
+    
+    if (nftsToProcess.length === 0) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: "No more NFTs to process",
+          startIndex,
+          totalNFTs: nfts.length,
+          processed: 0,
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        }
+      );
+    }
 
     // Check if we need to clear existing NFTs
     if (clearExisting) {
@@ -46,36 +69,28 @@ serve(async (req) => {
       console.log("Existing NFTs cleared successfully");
     }
 
-    // Process NFTs in smaller batches to avoid timeout and add a longer delay between batches
-    const results = [];
-    for (let i = 0; i < nfts.length; i += BATCH_SIZE) {
-      const batch = nfts.slice(i, i + BATCH_SIZE);
-      console.log(`Processing batch ${i / BATCH_SIZE + 1} of ${Math.ceil(nfts.length / BATCH_SIZE)}`);
-      
-      const { data, error } = await supabaseClient
-        .from("nfts")
-        .insert(batch)
-        .select();
+    // Process NFTs in small batches of 10
+    console.log(`Processing batch of ${nftsToProcess.length} NFTs starting at index ${startIndex}`);
+    
+    const { data, error } = await supabaseClient
+      .from("nfts")
+      .insert(nftsToProcess)
+      .select();
 
-      if (error) {
-        throw new Error(`Error inserting NFTs (batch ${i / BATCH_SIZE + 1}): ${error.message}`);
-      }
-
-      results.push(...(data || []));
-      console.log(`Batch ${i / BATCH_SIZE + 1} processed successfully`);
-      
-      // Add a longer delay between batches to avoid rate limiting and timeout issues
-      if (i + BATCH_SIZE < nfts.length) {
-        console.log(`Waiting 1 second before processing next batch...`);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
+    if (error) {
+      throw new Error(`Error inserting NFTs: ${error.message}`);
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Successfully inserted ${results.length} NFTs`,
-        data: results,
+        message: `Successfully inserted ${data?.length || 0} NFTs`,
+        data: data || [],
+        startIndex,
+        nextIndex: startIndex + count,
+        totalNFTs: nfts.length,
+        processed: nftsToProcess.length,
+        remaining: Math.max(0, nfts.length - (startIndex + count)),
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

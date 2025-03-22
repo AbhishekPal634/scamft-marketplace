@@ -10,9 +10,9 @@ interface RelatedNFTsProps {
 }
 
 const RelatedNFTs = ({ currentNftId, tags }: RelatedNFTsProps) => {
-  const { nfts } = useNFTStore();
+  const { nfts, fetchNFTs, isLoading } = useNFTStore();
   const [relatedNFTs, setRelatedNFTs] = useState<NFT[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // Get related NFTs based on shared tags, excluding the current NFT
@@ -26,11 +26,14 @@ const RelatedNFTs = ({ currentNftId, tags }: RelatedNFTsProps) => {
         .slice(0, 4); // Limit to 4 related items
       
       setRelatedNFTs(related);
-      setIsLoading(false);
+      setLoading(false);
+    } else {
+      // Fetch NFTs if not already loaded
+      fetchNFTs().then(() => setLoading(false));
     }
-  }, [nfts, currentNftId, tags]);
+  }, [nfts, currentNftId, tags, fetchNFTs]);
 
-  if (isLoading) {
+  if (loading || isLoading) {
     return (
       <div className="flex justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

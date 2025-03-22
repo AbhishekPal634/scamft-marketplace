@@ -8,13 +8,15 @@ import BlurImage from "@/components/ui/BlurImage";
 import { useNFTStore, NFT } from "@/services/nftService";
 
 const Hero = () => {
-  const { nfts, fetchNFTs } = useNFTStore();
+  const { nfts, fetchNFTs, isLoading } = useNFTStore();
   const [featuredNFTs, setFeaturedNFTs] = useState<NFT[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
     if (nfts.length === 0) {
-      fetchNFTs();
+      fetchNFTs().then(data => {
+        setFeaturedNFTs(data.slice(0, 3));
+      });
     } else {
       // Select 3 NFTs for the hero carousel
       setFeaturedNFTs(nfts.slice(0, 3));
@@ -54,8 +56,8 @@ const Hero = () => {
       
       <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 min-h-[75vh] flex items-center">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-center">
-          {/* Text Content - Now taking 3 columns and centered vertically */}
-          <div className="lg:col-span-3 space-y-6">
+          {/* Text Content - Centered vertically */}
+          <div className="lg:col-span-3 space-y-6 flex flex-col justify-center">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -93,7 +95,12 @@ const Hero = () => {
             </motion.div>
             
             {/* Stats Section - Moved up to be part of the text section */}
-            <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <motion.div 
+              className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-4"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3, ease: "easeOut" }}
+            >
               {[
                 { label: "Artists", value: "3.2K+" },
                 { label: "Artworks", value: "12K+" },
@@ -111,10 +118,10 @@ const Hero = () => {
                   <div className="text-muted-foreground text-sm">{stat.label}</div>
                 </motion.div>
               ))}
-            </div>
+            </motion.div>
           </div>
           
-          {/* Featured NFT Display - Now smaller (2 columns) */}
+          {/* Featured NFT Display */}
           <motion.div
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -146,7 +153,7 @@ const Hero = () => {
                     </div>
                     <div className="text-right">
                       <div className="text-xs text-muted-foreground">Price</div>
-                      <div className="font-medium text-sm">{currentNFT.price} ETH</div>
+                      <div className="font-medium text-sm">${currentNFT.price.toFixed(2)}</div>
                     </div>
                   </div>
                 </div>
