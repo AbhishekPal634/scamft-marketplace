@@ -17,4 +17,4 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.seed-nfts]
-verify_jwt = true
+verify_jwt = false
