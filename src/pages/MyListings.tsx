@@ -42,7 +42,7 @@ const MyListings = () => {
           id: nft.id,
           title: nft.title || "Untitled NFT",
           description: nft.description || "",
-          price: parseFloat(nft.price) || 0,
+          price: nft.price ? parseFloat(nft.price.toString()) : 0, // Convert to string then parse as float
           image: nft.image_url || "/placeholder.svg",
           image_url: nft.image_url || "/placeholder.svg",
           creator: {
