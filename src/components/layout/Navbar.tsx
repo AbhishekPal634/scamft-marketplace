@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -16,12 +15,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Menu, X, Search, ShoppingCart, User } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useSearch } from "@/hooks/useSearch";
-import { useMobile } from "@/hooks/use-mobile";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const Navbar = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const isMobile = useMobile();
+  const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const { search, results } = useSearch();
