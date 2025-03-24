@@ -115,68 +115,155 @@ async function generateEmbedding(text: string) {
   }
 }
 
+// Generate placeholder image URL based on theme
+function getPlaceholderImageUrl(theme: string) {
+  // Return a placeholder image based on the theme
+  const baseUrl = "https://placehold.co/600x600/";
+  
+  // Different color schemes for different themes
+  const themeColors = {
+    "cosmic": "000F42/FFFFFF",
+    "digital": "0B4F6C/FFFFFF",
+    "abstract": "845EC2/FFFFFF",
+    "futuristic": "4B4453/FFFFFF",
+    "cyberpunk": "FF2E63/FFFFFF",
+    "nature": "2C73D2/FFFFFF",
+    "retro": "FF9671/FFFFFF",
+    "pixel": "4D8076/FFFFFF",
+    "vaporwave": "C34A36/FFFFFF",
+    "neon": "00C9A7/FFFFFF",
+    "geometric": "4B4453/FFFFFF",
+    "minimalist": "3A3042/FFFFFF",
+    "surreal": "FF8066/FFFFFF",
+    "psychedelic": "D65DB1/FFFFFF",
+    "mystical": "361999/FFFFFF",
+    "underwater": "1B9AAA/FFFFFF",
+    "space": "0F111A/FFFFFF",
+    "steampunk": "AA8976/FFFFFF",
+    "fantasy": "9B89B3/FFFFFF",
+    "dystopian": "4A4238/FFFFFF"
+  };
+  
+  // Get the color for the theme or use a default
+  const colorScheme = themeColors[theme as keyof typeof themeColors] || "222222/FFFFFF";
+  
+  // Return the placeholder URL with the theme name
+  return `${baseUrl}${colorScheme}?text=${theme.toUpperCase()}`;
+}
+
 // Generate image using Hugging Face
-async function generateImage(prompt: string, nftId: string) {
+async function generateImage(prompt: string, nftId: string, theme: string) {
   try {
     console.log(`Generating image for NFT ${nftId} with prompt: ${prompt}`);
     
-    const response = await fetch("https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${huggingFaceToken}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ inputs: prompt })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Hugging Face API error: ${errorText}`);
-    }
-
-    const imageBlob = await response.blob();
-    const imageBytes = await imageBlob.arrayBuffer();
-    const imageBuffer = new Uint8Array(imageBytes);
-
-    // Generate a unique filename
-    const timestamp = Date.now();
-    const randomString = Math.random().toString(36).substring(2, 10);
-    const filename = `nft-${timestamp}-${randomString}.png`;
-    
-    // Create a storage bucket if it doesn't exist
-    const { data: buckets } = await supabase.storage.listBuckets();
-    if (!buckets?.some(bucket => bucket.name === 'nft-images')) {
-      console.log("Creating nft-images bucket");
-      await supabase.storage.createBucket('nft-images', {
-        public: true
-      });
-    }
-    
-    // Upload the image to Supabase Storage
-    console.log(`Uploading image for NFT ${nftId}`);
-    const { data: uploadData, error: uploadError } = await supabase
-      .storage
-      .from('nft-images')
-      .upload(`${nftId}/${filename}`, imageBuffer, {
-        contentType: 'image/png',
-        upsert: true
+    // Try to get image from Hugging Face API
+    try {
+      const response = await fetch("https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${huggingFaceToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ inputs: prompt }),
+        // Add a timeout to prevent hanging on API issues
+        signal: AbortSignal.timeout(15000) // 15 second timeout
       });
 
-    if (uploadError) {
-      throw new Error(`Failed to upload image: ${uploadError.message}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Hugging Face API error: ${errorText}`);
+      }
+
+      const imageBlob = await response.blob();
+      const imageBytes = await imageBlob.arrayBuffer();
+      const imageBuffer = new Uint8Array(imageBytes);
+
+      // Generate a unique filename
+      const timestamp = Date.now();
+      const randomString = Math.random().toString(36).substring(2, 10);
+      const filename = `nft-${timestamp}-${randomString}.png`;
+      
+      // Upload the image to Supabase Storage
+      console.log(`Uploading HF-generated image for NFT ${nftId}`);
+      const { data: uploadData, error: uploadError } = await supabase
+        .storage
+        .from('nft-images')
+        .upload(`${nftId}/${filename}`, imageBuffer, {
+          contentType: 'image/png',
+          upsert: true
+        });
+
+      if (uploadError) {
+        throw new Error(`Failed to upload image: ${uploadError.message}`);
+      }
+
+      // Get the public URL
+      const { data: publicUrlData } = await supabase
+        .storage
+        .from('nft-images')
+        .getPublicUrl(`${nftId}/${filename}`);
+
+      console.log(`Image URL: ${publicUrlData.publicUrl}`);
+      return publicUrlData.publicUrl;
+    } catch (huggingFaceError) {
+      console.error("Hugging Face API error:", huggingFaceError);
+      console.log("Falling back to placeholder image...");
+      
+      // If Hugging Face fails, use a placeholder image
+      const placeholderUrl = getPlaceholderImageUrl(theme);
+      console.log(`Using placeholder image: ${placeholderUrl}`);
+      
+      // If you want to store the placeholder as a local file in Supabase Storage
+      try {
+        // Fetch the placeholder image
+        const placeholderResponse = await fetch(placeholderUrl);
+        if (!placeholderResponse.ok) {
+          throw new Error(`Failed to fetch placeholder image: ${placeholderResponse.statusText}`);
+        }
+        
+        const placeholderBlob = await placeholderResponse.blob();
+        const placeholderBytes = await placeholderBlob.arrayBuffer();
+        const placeholderBuffer = new Uint8Array(placeholderBytes);
+        
+        // Generate a unique filename for the placeholder
+        const timestamp = Date.now();
+        const randomString = Math.random().toString(36).substring(2, 10);
+        const filename = `placeholder-${timestamp}-${randomString}.png`;
+        
+        // Upload the placeholder to Supabase Storage
+        console.log(`Uploading placeholder image for NFT ${nftId}`);
+        const { data: uploadData, error: uploadError } = await supabase
+          .storage
+          .from('nft-images')
+          .upload(`${nftId}/${filename}`, placeholderBuffer, {
+            contentType: 'image/png',
+            upsert: true
+          });
+        
+        if (uploadError) {
+          console.error("Error uploading placeholder:", uploadError);
+          // Return the placeholder URL directly if upload fails
+          return placeholderUrl;
+        }
+        
+        // Get the public URL for the uploaded placeholder
+        const { data: publicUrlData } = await supabase
+          .storage
+          .from('nft-images')
+          .getPublicUrl(`${nftId}/${filename}`);
+        
+        console.log(`Placeholder URL: ${publicUrlData.publicUrl}`);
+        return publicUrlData.publicUrl;
+      } catch (placeholderError) {
+        console.error("Error processing placeholder:", placeholderError);
+        // Return the placeholder URL directly in case of any error
+        return placeholderUrl;
+      }
     }
-
-    // Get the public URL
-    const { data: publicUrlData } = await supabase
-      .storage
-      .from('nft-images')
-      .getPublicUrl(`${nftId}/${filename}`);
-
-    console.log(`Image URL: ${publicUrlData.publicUrl}`);
-    return publicUrlData.publicUrl;
   } catch (error) {
-    console.error("Error generating image:", error);
-    throw error;
+    console.error("Error in image generation:", error);
+    // Return a fallback URL if everything fails
+    return `https://placehold.co/600x600/333/FFF?text=NFT+${nftId.slice(0, 8)}`;
   }
 }
 
@@ -189,9 +276,9 @@ serve(async (req) => {
   try {
     const { count = 10 } = await req.json();
     
-    if (!geminiApiKey || !huggingFaceToken) {
+    if (!geminiApiKey) {
       return new Response(
-        JSON.stringify({ error: "API keys not configured" }),
+        JSON.stringify({ error: "Gemini API key not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -227,9 +314,10 @@ serve(async (req) => {
         
         console.log(`Generating NFT ${i+1}/${limit}: ${nftData.title} by creator ${creatorId}`);
         
-        // Generate and upload image first
+        // Generate and upload image first - pass the theme for placeholders
         console.log(`Generating image for NFT ${nftId}`);
-        const imageUrl = await generateImage(nftData.promptForImage, nftId);
+        const randomTheme = nftData.tags.find(tag => nftThemes.includes(tag)) || "digital";
+        const imageUrl = await generateImage(nftData.promptForImage, nftId, randomTheme);
         
         // Generate text for embedding
         const textForEmbedding = [
