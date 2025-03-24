@@ -1,239 +1,293 @@
 
 import { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { 
-  ShoppingCart, 
-  Search, 
-  Menu, 
-  X, 
-  User,
-  Heart
-} from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Menu, X, Search, ShoppingCart, User } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
-import { useToast } from "@/components/ui/use-toast";
-import { useCartStore } from "@/services/cartService";
+import { useSearch } from "@/hooks/useSearch";
+import { useMobile } from "@/hooks/use-mobile";
 
 const Navbar = () => {
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  const isMobile = useMobile();
+  const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const location = useLocation();
-  const { toast } = useToast();
-  const cartCount = useCartStore((state) => state.items.length);
-  
-  // Handle scroll effect
+  const { search, results } = useSearch();
+  const [showSearchResults, setShowSearchResults] = useState(false);
+
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 10);
+    const handleSearch = async () => {
+      if (searchQuery.trim() === "") {
+        setShowSearchResults(false);
+        return;
+      }
+
+      await search(searchQuery);
+      setShowSearchResults(true);
     };
-    
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-  
-  // Close mobile menu when route changes
-  useEffect(() => {
-    setIsMobileMenuOpen(false);
-  }, [location.pathname]);
-  
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      // Navigate to search page with query
-      window.location.href = `/explore?search=${encodeURIComponent(searchQuery)}`;
-    }
-  };
-  
-  const navLinks = [
-    { name: "Home", path: "/" },
-    { name: "Explore", path: "/explore" },
-    { name: "Collections", path: "/collections" },
-    { name: "About", path: "/about" },
-  ];
-  
-  const isActive = (path: string) => {
-    return location.pathname === path;
+
+    const debounce = setTimeout(handleSearch, 300);
+    return () => clearTimeout(debounce);
+  }, [searchQuery, search]);
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate("/");
   };
 
-  return (
-    <nav 
-      className={cn(
-        "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
-        isScrolled 
-          ? "py-3 glass shadow-sm" 
-          : "py-5 bg-transparent"
-      )}
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between">
-          {/* Logo */}
-          <Link 
-            to="/" 
-            className="text-xl font-semibold flex items-center transition-transform hover:scale-105"
-          >
-            <span className="bg-primary/10 text-primary px-2 py-1 rounded-md mr-1">Scam</span>
-            <span>FT</span>
-          </Link>
-          
-          {/* Desktop Nav Items */}
-          <div className="hidden md:flex space-x-8">
-            {navLinks.map((link) => (
-              <Link
-                key={link.path}
-                to={link.path}
-                className={cn(
-                  "text-sm font-medium transition-colors hover:text-primary relative",
-                  isActive(link.path) ? "text-primary" : "text-foreground"
-                )}
-              >
-                {link.name}
-                {isActive(link.path) && (
-                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-primary rounded-full transform origin-left" />
-                )}
-              </Link>
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate("/explore", { state: { searchQuery } });
+      setSearchQuery("");
+      setShowSearchResults(false);
+    }
+  };
+
+  const closeMenu = () => setOpen(false);
+
+  const userNavItems = [
+    { label: "Profile", href: "/profile", icon: <User className="h-4 w-4 mr-2" /> },
+    { label: "My NFTs", href: "/profile", icon: <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg> },
+    { label: "My Listings", href: "/my-listings", icon: <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg> },
+    { label: "Create NFT", href: "/create", icon: <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg> },
+  ];
+
+  const authButtons = (
+    <>
+      {user ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+              <Avatar>
+                <AvatarImage src={user.user_metadata?.avatar_url || ""} />
+                <AvatarFallback>{user.email?.charAt(0)?.toUpperCase() || "U"}</AvatarFallback>
+              </Avatar>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>My Account</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {userNavItems.map((item) => (
+              <DropdownMenuItem key={item.href} asChild>
+                <Link to={item.href} className="flex items-center">
+                  {item.icon}
+                  {item.label}
+                </Link>
+              </DropdownMenuItem>
             ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleLogout} className="text-red-500">
+              Log out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : (
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" onClick={() => navigate("/login")}>
+            Sign In
+          </Button>
+          <Button onClick={() => navigate("/register")}>Register</Button>
+        </div>
+      )}
+    </>
+  );
+
+  const navItems = [
+    { name: "Home", path: "/" },
+    { name: "Explore", path: "/explore" },
+  ];
+
+  const mobileMenu = (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Button variant="ghost" size="icon" className="md:hidden">
+          <Menu />
+          <span className="sr-only">Toggle menu</span>
+        </Button>
+      </SheetTrigger>
+      <SheetContent side="left">
+        <div className="flex flex-col h-full">
+          <div className="flex items-center justify-between py-4">
+            <Link to="/" className="font-bold text-xl" onClick={closeMenu}>
+              NFT Marketplace
+            </Link>
+            <Button variant="ghost" size="icon" onClick={closeMenu}>
+              <X />
+              <span className="sr-only">Close menu</span>
+            </Button>
           </div>
           
-          {/* Search, Cart, User (Desktop) */}
-          <div className="hidden md:flex items-center space-x-4">
-            <form onSubmit={handleSearch} className="relative">
+          <div className="flex flex-col gap-4 py-4">
+            {navItems.map((item) => (
+              <Link
+                key={item.path}
+                to={item.path}
+                className="px-2 py-1 text-lg hover:text-primary"
+                onClick={closeMenu}
+              >
+                {item.name}
+              </Link>
+            ))}
+            
+            {user && (
+              <>
+                {userNavItems.map((item) => (
+                  <Link
+                    key={item.href}
+                    to={item.href}
+                    className="px-2 py-1 text-lg hover:text-primary flex items-center"
+                    onClick={closeMenu}
+                  >
+                    {item.icon}
+                    {item.label}
+                  </Link>
+                ))}
+                <button
+                  onClick={() => {
+                    handleLogout();
+                    closeMenu();
+                  }}
+                  className="px-2 py-1 text-lg text-red-500 hover:text-red-600 text-left"
+                >
+                  Log out
+                </button>
+              </>
+            )}
+            
+            {!user && (
+              <div className="flex flex-col gap-2 mt-2">
+                <Button onClick={() => { navigate("/login"); closeMenu(); }}>
+                  Sign In
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => { navigate("/register"); closeMenu(); }}
+                >
+                  Register
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+
+  return (
+    <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container flex h-16 items-center">
+        <div className="flex items-center justify-between w-full gap-4">
+          {/* Logo and Mobile Menu */}
+          <div className="flex items-center">
+            {isMobile && mobileMenu}
+            <Link to="/" className="font-bold text-xl ml-2">
+              NFT Marketplace
+            </Link>
+          </div>
+
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex items-center gap-6">
+            {navItems.map((item) => (
+              <Link
+                key={item.path}
+                to={item.path}
+                className="text-sm font-medium hover:text-primary"
+              >
+                {item.name}
+              </Link>
+            ))}
+          </nav>
+
+          {/* Search */}
+          <div className="flex-1 mx-4 max-w-md relative">
+            <form onSubmit={handleSearchSubmit} className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
                 placeholder="Search NFTs..."
-                className="w-44 lg:w-64 rounded-full bg-secondary/70 border-none focus:ring-primary"
+                className="pl-8"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setShowSearchResults(true)}
+                onBlur={() => setTimeout(() => setShowSearchResults(false), 200)}
               />
-              <Button 
-                type="submit" 
-                size="icon" 
-                variant="ghost" 
-                className="absolute right-0 top-0 h-full rounded-full"
-              >
-                <Search className="h-4 w-4" />
-              </Button>
             </form>
-            
-            <Link to="/wishlist">
-              <Button variant="ghost" size="icon" className="relative">
-                <Heart className="h-5 w-5" />
-              </Button>
-            </Link>
-            
-            <Link to="/cart">
-              <Button variant="ghost" size="icon" className="relative">
-                <ShoppingCart className="h-5 w-5" />
-                {cartCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center animate-scale-in">
-                    {cartCount}
-                  </span>
-                )}
-              </Button>
-            </Link>
-            
-            <Button 
-              variant="ghost" 
-              size="icon"
-              onClick={() => toast({
-                title: "Coming soon",
-                description: "Account functionality will be available soon!"
-              })}
-            >
-              <User className="h-5 w-5" />
-            </Button>
+            {showSearchResults && results.length > 0 && (
+              <div className="absolute z-50 top-full mt-1 w-full bg-background border rounded-md shadow-lg overflow-hidden">
+                <div className="p-2">
+                  <h3 className="text-sm font-semibold mb-2">Search Results</h3>
+                  <div className="space-y-1">
+                    {results.slice(0, 5).map((result) => (
+                      <Link
+                        key={result.id}
+                        to={`/nft/${result.id}`}
+                        className="flex items-center gap-2 p-2 hover:bg-muted rounded-md"
+                        onClick={() => {
+                          setSearchQuery("");
+                          setShowSearchResults(false);
+                        }}
+                      >
+                        <div className="h-8 w-8 rounded overflow-hidden bg-secondary">
+                          <img
+                            src={result.image || "/placeholder.svg"}
+                            alt={result.title}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{result.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {result.price} ETH
+                          </p>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                  {results.length > 5 && (
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="w-full mt-2"
+                      onClick={() => {
+                        navigate("/explore", { state: { searchQuery } });
+                        setSearchQuery("");
+                        setShowSearchResults(false);
+                      }}
+                    >
+                      View all {results.length} results
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
-          
-          {/* Mobile Menu Button */}
-          <div className="flex md:hidden items-center space-x-4">
+
+          {/* Cart and Auth */}
+          <div className="flex items-center gap-2">
             <Link to="/cart">
               <Button variant="ghost" size="icon" className="relative">
                 <ShoppingCart className="h-5 w-5" />
-                {cartCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    {cartCount}
-                  </span>
-                )}
+                <span className="sr-only">Shopping cart</span>
               </Button>
             </Link>
-            
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              aria-label="Toggle menu"
-            >
-              {isMobileMenuOpen ? (
-                <X className="h-5 w-5" />
-              ) : (
-                <Menu className="h-5 w-5" />
-              )}
-            </Button>
+            {!isMobile && authButtons}
           </div>
         </div>
       </div>
-      
-      {/* Mobile Menu */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden glass animate-fade-in py-4 px-4 mt-2">
-          {/* Mobile Search */}
-          <form onSubmit={handleSearch} className="mb-4">
-            <div className="relative">
-              <Input
-                type="search"
-                placeholder="Search NFTs..."
-                className="w-full rounded-full bg-secondary/70 border-none focus:ring-primary"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <Button 
-                type="submit" 
-                size="icon" 
-                variant="ghost" 
-                className="absolute right-0 top-0 h-full rounded-full"
-              >
-                <Search className="h-4 w-4" />
-              </Button>
-            </div>
-          </form>
-          
-          {/* Mobile Nav Links */}
-          <div className="flex flex-col space-y-4">
-            {navLinks.map((link) => (
-              <Link
-                key={link.path}
-                to={link.path}
-                className={cn(
-                  "text-base font-medium px-3 py-2 rounded-md transition-colors",
-                  isActive(link.path) 
-                    ? "bg-primary/10 text-primary" 
-                    : "hover:bg-secondary"
-                )}
-              >
-                {link.name}
-              </Link>
-            ))}
-            
-            <Link
-              to="/wishlist"
-              className="text-base font-medium px-3 py-2 rounded-md transition-colors hover:bg-secondary flex items-center"
-            >
-              <Heart className="h-4 w-4 mr-2" />
-              Wishlist
-            </Link>
-            
-            <Link
-              to="/profile"
-              className="text-base font-medium px-3 py-2 rounded-md transition-colors hover:bg-secondary flex items-center"
-            >
-              <User className="h-4 w-4 mr-2" />
-              Profile
-            </Link>
-          </div>
-        </div>
-      )}
-    </nav>
+    </header>
   );
 };
 

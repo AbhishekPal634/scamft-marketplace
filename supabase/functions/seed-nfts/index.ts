@@ -12,7 +12,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Initialize the Supabase client
+// Initialize the Supabase client with the service role key to bypass RLS
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // NFT themes and styles for generation
@@ -27,6 +27,12 @@ const artStyles = [
   "digital art", "oil painting", "watercolor", "3D render", "pixel art",
   "concept art", "vector art", "illustration", "voxel art", "sketch",
   "photography", "abstract", "cubism", "surrealism", "impressionism"
+];
+
+// Predefined creator IDs based on the provided users
+const creatorIds = [
+  "4c293002-7f6f-427d-894b-1b7adcee1bf9",  // AbhiRockz
+  "f5c2b1f2-be81-47f4-9ba6-01915b8e21c7"   // Abhishek Pal
 ];
 
 // Generate random NFT data
@@ -100,6 +106,8 @@ async function generateEmbedding(text: string) {
 // Generate image using Hugging Face
 async function generateImage(prompt: string, nftId: string) {
   try {
+    console.log(`Generating image for NFT ${nftId} with prompt: ${prompt}`);
+    
     const response = await fetch("https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell", {
       method: "POST",
       headers: {
@@ -122,14 +130,24 @@ async function generateImage(prompt: string, nftId: string) {
     const timestamp = Date.now();
     const randomString = Math.random().toString(36).substring(2, 10);
     const filename = `nft-${timestamp}-${randomString}.png`;
-    const filePath = `${nftId}/${filename}`;
-
+    
+    // Create a storage bucket if it doesn't exist
+    const { data: buckets } = await supabase.storage.listBuckets();
+    if (!buckets?.some(bucket => bucket.name === 'nft-images')) {
+      console.log("Creating nft-images bucket");
+      await supabase.storage.createBucket('nft-images', {
+        public: true
+      });
+    }
+    
     // Upload the image to Supabase Storage
+    console.log(`Uploading image for NFT ${nftId}`);
     const { data: uploadData, error: uploadError } = await supabase
       .storage
       .from('nft-images')
-      .upload(filePath, imageBuffer, {
-        contentType: 'image/png'
+      .upload(`${nftId}/${filename}`, imageBuffer, {
+        contentType: 'image/png',
+        upsert: true
       });
 
     if (uploadError) {
@@ -140,8 +158,9 @@ async function generateImage(prompt: string, nftId: string) {
     const { data: publicUrlData } = await supabase
       .storage
       .from('nft-images')
-      .getPublicUrl(filePath);
+      .getPublicUrl(`${nftId}/${filename}`);
 
+    console.log(`Image URL: ${publicUrlData.publicUrl}`);
     return publicUrlData.publicUrl;
   } catch (error) {
     console.error("Error generating image:", error);
@@ -165,74 +184,97 @@ serve(async (req) => {
       );
     }
 
-    // Get any existing profile to use as creator
-    const { data: profiles, error: profilesError } = await supabase
-      .from('profiles')
-      .select('id')
-      .limit(1);
+    console.log(`Starting to generate ${count} NFTs...`);
     
-    if (profilesError) {
-      throw new Error(`Failed to get creator profile: ${profilesError.message}`);
+    // First, check if storage bucket exists
+    const { data: buckets } = await supabase.storage.listBuckets();
+    if (!buckets?.some(bucket => bucket.name === 'nft-images')) {
+      console.log("Creating nft-images bucket");
+      const { error } = await supabase.storage.createBucket('nft-images', {
+        public: true
+      });
+      if (error) {
+        console.error("Error creating bucket:", error);
+        throw new Error(`Failed to create storage bucket: ${error.message}`);
+      }
     }
-    
-    const creatorId = profiles && profiles.length > 0 ? profiles[0].id : null;
 
     const results = [];
     const limit = Math.min(count, 10); // Cap at 10 NFTs
     
     for (let i = 0; i < limit; i++) {
-      // Generate random NFT data
-      const nftData = generateRandomNFT(i);
-      
-      // Generate a UUID for the NFT
-      const nftId = crypto.randomUUID();
-      
-      // Generate text for embedding
-      const textForEmbedding = [
-        nftData.title,
-        nftData.description,
-        ...nftData.tags
-      ].join(" ");
-      
-      // Generate embedding
-      const embedding = await generateEmbedding(textForEmbedding);
-      
-      // Generate and upload image
-      const imageUrl = await generateImage(nftData.promptForImage, nftId);
-      
-      // Insert NFT into database
-      const { data: insertedNft, error: insertError } = await supabase
-        .from('nfts')
-        .insert([{
+      try {
+        // Generate random NFT data
+        const nftData = generateRandomNFT(i);
+        
+        // Generate a UUID for the NFT
+        const nftId = crypto.randomUUID();
+        
+        // Select a random creator ID from our predefined list
+        const creatorId = creatorIds[Math.floor(Math.random() * creatorIds.length)];
+        
+        console.log(`Generating NFT ${i+1}/${limit}: ${nftData.title} by creator ${creatorId}`);
+        
+        // Generate and upload image first
+        console.log(`Generating image for NFT ${nftId}`);
+        const imageUrl = await generateImage(nftData.promptForImage, nftId);
+        
+        // Generate text for embedding
+        const textForEmbedding = [
+          nftData.title,
+          nftData.description,
+          ...nftData.tags
+        ].join(" ");
+        
+        // Generate embedding
+        console.log(`Generating embedding for NFT ${nftId}`);
+        const embedding = await generateEmbedding(textForEmbedding);
+        
+        // Insert NFT into database
+        console.log(`Inserting NFT ${nftId} into database`);
+        const { data: insertedNft, error: insertError } = await supabase
+          .from('nfts')
+          .insert([{
+            id: nftId,
+            title: nftData.title,
+            description: nftData.description,
+            price: nftData.price,
+            creator_id: creatorId,
+            image_url: imageUrl,
+            category: nftData.category,
+            tags: nftData.tags,
+            embedding: embedding,
+            editions_total: nftData.editions.total,
+            editions_available: nftData.editions.available,
+            likes: Math.floor(Math.random() * 200),
+            views: Math.floor(Math.random() * 2000)
+          }])
+          .select();
+        
+        if (insertError) {
+          console.error(`Error inserting NFT ${i}:`, insertError);
+          throw new Error(`Failed to insert NFT: ${insertError.message}`);
+        }
+        
+        results.push({
           id: nftId,
           title: nftData.title,
-          description: nftData.description,
-          price: nftData.price,
-          creator_id: creatorId,
-          image_url: imageUrl,
-          category: nftData.category,
-          tags: nftData.tags,
-          embedding: embedding,
-          editions_total: nftData.editions.total,
-          editions_available: nftData.editions.available,
-          likes: Math.floor(Math.random() * 200),
-          views: Math.floor(Math.random() * 2000)
-        }])
-        .select();
-      
-      if (insertError) {
-        console.error(`Error inserting NFT ${i}:`, insertError);
-        continue; // Skip to next NFT if this one fails
+          imageUrl: imageUrl,
+          creatorId: creatorId
+        });
+        
+        console.log(`Successfully created NFT ${i+1}/${limit}`);
+        
+        // Add a small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (nftError) {
+        console.error(`Error creating NFT ${i}:`, nftError);
+        // Continue with the next NFT
       }
-      
-      results.push({
-        id: nftId,
-        title: nftData.title,
-        imageUrl: imageUrl
-      });
-      
-      // Add a small delay to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    if (results.length === 0) {
+      throw new Error("Failed to create any NFTs");
     }
 
     return new Response(
@@ -246,7 +288,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error generating NFTs:", error);
     return new Response(
-      JSON.stringify({ error: error.message || "Internal server error" }),
+      JSON.stringify({ error: error.message || "Internal server error", success: false }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

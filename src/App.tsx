@@ -12,6 +12,8 @@ import Register from "@/pages/Register";
 import NotFound from "@/pages/NotFound";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import Profile from "@/pages/Profile";
+import CreateListing from "@/pages/CreateListing";
+import MyListings from "@/pages/MyListings";
 
 function App() {
   return (
@@ -29,6 +31,16 @@ function App() {
         <Route path="/profile" element={
           <ProtectedRoute>
             <Profile />
+          </ProtectedRoute>
+        } />
+        <Route path="/create" element={
+          <ProtectedRoute>
+            <CreateListing />
+          </ProtectedRoute>
+        } />
+        <Route path="/my-listings" element={
+          <ProtectedRoute>
+            <MyListings />
           </ProtectedRoute>
         } />
         <Route path="/login" element={<Login />} />
