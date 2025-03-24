@@ -96,7 +96,19 @@ async function generateEmbedding(text: string) {
     }
 
     const data = await response.json();
-    return data.embedding.values;
+    
+    // Process the embedding to ensure it's 384 dimensions
+    // Take the first 384 dimensions if larger or pad with zeros if smaller
+    let values = data.embedding.values;
+    if (values.length > 384) {
+      console.log(`Truncating embedding from ${values.length} to 384 dimensions`);
+      values = values.slice(0, 384);
+    } else if (values.length < 384) {
+      console.log(`Padding embedding from ${values.length} to 384 dimensions`);
+      values = [...values, ...Array(384 - values.length).fill(0)];
+    }
+    
+    return values;
   } catch (error) {
     console.error("Error generating embedding:", error);
     throw error;

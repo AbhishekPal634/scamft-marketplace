@@ -65,7 +65,16 @@ serve(async (req) => {
     }
 
     const data = await embeddingResponse.json();
-    const embedding = data.embedding.values;
+    
+    // Process the embedding to ensure it's 384 dimensions
+    let embedding = data.embedding.values;
+    if (embedding.length > 384) {
+      console.log(`Truncating embedding from ${embedding.length} to 384 dimensions`);
+      embedding = embedding.slice(0, 384);
+    } else if (embedding.length < 384) {
+      console.log(`Padding embedding from ${embedding.length} to 384 dimensions`);
+      embedding = [...embedding, ...Array(384 - embedding.length).fill(0)];
+    }
 
     // Update the NFT with the embedding
     const { error: updateError } = await supabase
