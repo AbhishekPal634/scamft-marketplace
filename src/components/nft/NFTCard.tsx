@@ -1,12 +1,14 @@
 
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Heart, Share2, ExternalLink } from "lucide-react";
+import { Heart, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import BlurImage from "@/components/ui/BlurImage";
 import { NFT, useNFTStore } from "@/services/nftService";
 import { useCartStore } from "@/services/cartService";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext";
 
 interface NFTCardProps {
   nft: NFT;
@@ -18,11 +20,54 @@ const NFTCard = ({ nft, minimal = false }: NFTCardProps) => {
   const toggleLike = useNFTStore((state) => state.toggleLike);
   const addToCart = useCartStore((state) => state.addItem);
   const { toast } = useToast();
+  const { user } = useAuth();
   
-  const handleLike = (e: React.MouseEvent) => {
+  const handleLike = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    toggleLike(nft.id);
+    
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to like this NFT",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      // Update local state immediately for UI responsiveness
+      toggleLike(nft.id);
+      
+      // Get current likes count from the database
+      const { data: currentNft } = await supabase
+        .from('nfts')
+        .select('likes')
+        .eq('id', nft.id)
+        .single();
+        
+      // Determine new likes count based on whether the user is liking or unliking
+      const newLikesCount = nft.isLiked 
+        ? Math.max((currentNft?.likes || 0) - 1, 0) // Unliking - subtract 1, but don't go below 0
+        : (currentNft?.likes || 0) + 1; // Liking - add 1
+        
+      // Update the likes count in the database
+      await supabase
+        .from('nfts')
+        .update({ likes: newLikesCount })
+        .eq('id', nft.id);
+    } catch (error) {
+      console.error("Error updating likes:", error);
+      
+      // Revert the local state change if the API call failed
+      toggleLike(nft.id);
+      
+      toast({
+        title: "Error",
+        description: "Could not update like status",
+        variant: "destructive"
+      });
+    }
   };
   
   const handleShare = (e: React.MouseEvent) => {
@@ -119,10 +164,10 @@ const NFTCard = ({ nft, minimal = false }: NFTCardProps) => {
             <div>
               <h3 className="font-medium line-clamp-1">{nft.title}</h3>
               
-              {!minimal && (
+              {!minimal && nft.creator && nft.creator.name && (
                 <div className="flex items-center mt-1">
                   <img
-                    src={nft.creator.avatar}
+                    src={nft.creator.avatar || "/placeholder.svg"}
                     alt={nft.creator.name}
                     className="w-5 h-5 rounded-full mr-1.5"
                   />
@@ -141,10 +186,9 @@ const NFTCard = ({ nft, minimal = false }: NFTCardProps) => {
           
           {!minimal && (
             <div className="mt-3 flex justify-between items-center text-xs text-muted-foreground">
-              <div>Edition {nft.editions.available} of {nft.editions.total}</div>
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center">
+                <Heart className={`h-3 w-3 mr-1 ${nft.isLiked ? "fill-red-500 text-red-500" : ""}`} />
                 <span>{nft.likes} likes</span>
-                <span>{nft.views} views</span>
               </div>
             </div>
           )}

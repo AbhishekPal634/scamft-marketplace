@@ -27,6 +27,17 @@ const MyListings = () => {
       try {
         setIsLoading(true);
         
+        // First fetch profile details to get creator name
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
+        
+        const creatorName = profileData?.full_name || user.user_metadata?.full_name || user.email;
+        const creatorAvatar = profileData?.avatar_url || user.user_metadata?.avatar_url || "/placeholder.svg";
+        
+        // Then fetch the NFTs
         const { data, error } = await supabase
           .from("nfts")
           .select("*")
@@ -42,13 +53,13 @@ const MyListings = () => {
           id: nft.id,
           title: nft.title || "Untitled NFT",
           description: nft.description || "",
-          price: nft.price ? parseFloat(String(nft.price)) : 0, // Convert to string then parse
+          price: typeof nft.price === 'number' ? nft.price : parseFloat(String(nft.price)) || 0,
           image: nft.image_url || "/placeholder.svg",
           image_url: nft.image_url || "/placeholder.svg",
           creator: {
             id: nft.creator_id || "0",
-            name: user.user_metadata?.full_name || "Unknown Artist",
-            avatar: user.user_metadata?.avatar_url || "/placeholder.svg",
+            name: creatorName,
+            avatar: creatorAvatar,
           },
           createdAt: nft.created_at || new Date().toISOString(),
           tags: nft.tags || [],

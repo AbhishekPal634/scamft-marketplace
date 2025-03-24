@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -16,6 +17,8 @@ import { Menu, X, Search, ShoppingCart, User } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useSearch } from "@/hooks/useSearch";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useCartStore } from "@/services/cartService";
+import { Badge } from "@/components/ui/badge";
 
 const Navbar = () => {
   const { user, signOut } = useAuth();
@@ -25,6 +28,8 @@ const Navbar = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const { search, results } = useSearch();
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const { items, getItemCount } = useCartStore();
+  const cartItemCount = getItemCount();
 
   useEffect(() => {
     const handleSearch = async () => {
@@ -121,7 +126,7 @@ const Navbar = () => {
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-between py-4">
             <Link to="/" className="font-bold text-xl" onClick={closeMenu}>
-              NFT Marketplace
+              ScamFT
             </Link>
             <Button variant="ghost" size="icon" onClick={closeMenu}>
               <X />
@@ -193,7 +198,7 @@ const Navbar = () => {
           <div className="flex items-center">
             {isMobile && mobileMenu}
             <Link to="/" className="font-bold text-xl ml-2">
-              NFT Marketplace
+              ScamFT
             </Link>
           </div>
 
@@ -280,6 +285,11 @@ const Navbar = () => {
               <Button variant="ghost" size="icon" className="relative">
                 <ShoppingCart className="h-5 w-5" />
                 <span className="sr-only">Shopping cart</span>
+                {cartItemCount > 0 && (
+                  <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
+                    {cartItemCount > 9 ? '9+' : cartItemCount}
+                  </Badge>
+                )}
               </Button>
             </Link>
             {!isMobile && authButtons}

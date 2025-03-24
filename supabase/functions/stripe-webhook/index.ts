@@ -63,7 +63,50 @@ serve(async (req) => {
           break;
         }
 
-        // TODO: Handle purchase items and update NFT availability
+        const purchaseId = purchase[0].id;
+        console.log(`Created purchase record with ID: ${purchaseId}`);
+        
+        // Handle purchase items from metadata
+        if (session.metadata.items) {
+          try {
+            const items = JSON.parse(session.metadata.items);
+            
+            for (const item of items) {
+              // Add item to purchase_items table
+              const { error: itemError } = await supabase
+                .from("purchase_items")
+                .insert({
+                  purchase_id: purchaseId,
+                  nft_id: item.id,
+                  quantity: item.quantity,
+                  price_per_item: item.price
+                });
+                
+              if (itemError) {
+                console.error(`Error recording purchase item ${item.id}:`, itemError);
+                continue;
+              }
+              
+              // Update the NFT to transfer ownership and remove from marketplace
+              const { error: nftUpdateError } = await supabase
+                .from("nfts")
+                .update({ 
+                  owner_id: userId,
+                  is_listed: false, 
+                  editions_available: 0 
+                })
+                .eq("id", item.id);
+                
+              if (nftUpdateError) {
+                console.error(`Error updating NFT ${item.id}:`, nftUpdateError);
+              } else {
+                console.log(`Successfully transferred ownership of NFT ${item.id} to user ${userId}`);
+              }
+            }
+          } catch (parseError) {
+            console.error("Error parsing items from metadata:", parseError);
+          }
+        }
 
         console.log(`Payment successful: ${session.id} by user ${userId}`);
         break;
