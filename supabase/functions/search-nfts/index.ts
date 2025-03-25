@@ -43,7 +43,10 @@ serve(async (req) => {
     if (!query && !embedding) {
       console.error("Missing query or embedding parameter");
       return new Response(
-        JSON.stringify({ error: "Missing query or embedding parameter" }),
+        JSON.stringify({ 
+          error: "Missing query or embedding parameter",
+          results: [] 
+        }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -189,7 +192,7 @@ serve(async (req) => {
         }
         
         return new Response(
-          JSON.stringify({ error: "Vector search failed", details: error.message }),
+          JSON.stringify({ error: "Vector search failed", details: error.message, results: [] }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -204,13 +207,13 @@ serve(async (req) => {
 
     // This should never happen but just in case
     return new Response(
-      JSON.stringify({ error: "Invalid search parameters" }),
+      JSON.stringify({ error: "Invalid search parameters", results: [] }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
     console.error("Error searching NFTs:", error);
     return new Response(
-      JSON.stringify({ error: error.message || "Internal server error" }),
+      JSON.stringify({ error: error.message || "Internal server error", results: [] }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

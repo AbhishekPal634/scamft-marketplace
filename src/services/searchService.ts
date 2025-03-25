@@ -3,6 +3,12 @@ import { NFT, useNFTStore } from "./nftService";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 
+// Define a type for the search response
+interface SearchResponse {
+  results: any[];
+  [key: string]: any;
+}
+
 // This function uses the Supabase edge function for proper vector search
 export const searchNFTsByText = async (query: string): Promise<NFT[]> => {
   try {
@@ -13,7 +19,7 @@ export const searchNFTsByText = async (query: string): Promise<NFT[]> => {
       setTimeout(() => reject(new Error('Search timeout')), 10000);
     });
     
-    const searchPromise = supabase.functions.invoke('search-nfts', {
+    const searchPromise = supabase.functions.invoke<SearchResponse>('search-nfts', {
       body: { query, limit: 20 },
       headers: {
         "Content-Type": "application/json"
@@ -35,7 +41,7 @@ export const searchNFTsByText = async (query: string): Promise<NFT[]> => {
       return fallbackLocalSearch(query);
     }
 
-    const data = response;
+    const data = response.data;
     
     if (!data || !data.results) {
       console.warn("Search returned no data or results property");
@@ -123,7 +129,7 @@ export const findSimilarNFTs = async (nftId: string, limit = 4): Promise<NFT[]> 
         setTimeout(() => reject(new Error('Search timeout')), 10000);
       });
       
-      const searchPromise = supabase.functions.invoke('search-nfts', {
+      const searchPromise = supabase.functions.invoke<SearchResponse>('search-nfts', {
         body: { 
           embedding: nft.embedding,
           limit: limit + 1 // Request one more so we can filter out the current NFT
@@ -141,7 +147,7 @@ export const findSimilarNFTs = async (nftId: string, limit = 4): Promise<NFT[]> 
         throw new Error(response.error);
       }
       
-      const data = response;
+      const data = response.data;
       
       // Filter out the current NFT and any unlisted NFTs
       const similarNfts = data?.results

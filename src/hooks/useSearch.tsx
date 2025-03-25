@@ -4,6 +4,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { NFT } from "@/services/nftService";
 import { toast } from "@/components/ui/use-toast";
 
+// Define a type for the search response
+interface SearchResponse {
+  results: any[];
+  [key: string]: any;
+}
+
 export const useSearch = () => {
   const [results, setResults] = useState<NFT[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -26,7 +32,7 @@ export const useSearch = () => {
         setTimeout(() => reject(new Error('Search timeout')), 10000);
       });
       
-      const searchPromise = supabase.functions.invoke('search-nfts', {
+      const searchPromise = supabase.functions.invoke<SearchResponse>('search-nfts', {
         body: { query },
         headers: {
           "Content-Type": "application/json"
@@ -42,7 +48,7 @@ export const useSearch = () => {
         throw new Error(response.error);
       }
 
-      const data = response;
+      const data = response.data;
       
       if (!data) {
         console.warn("Search returned no data");
