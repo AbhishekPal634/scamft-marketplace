@@ -21,16 +21,30 @@ export const useSearch = () => {
     try {
       console.log("Searching for:", query);
       const { data, error: supabaseError } = await supabase.functions.invoke('search-nfts', {
-        body: { query }
+        body: { query },
+        headers: {
+          "Content-Type": "application/json"
+        }
       });
 
       if (supabaseError) {
         console.error("Search error:", supabaseError);
-        throw new Error(supabaseError.message);
+        throw new Error(supabaseError.message || "Search failed");
       }
 
-      if (!data || !data.results) {
-        console.warn("Search returned no data or results property");
+      if (!data) {
+        console.warn("Search returned no data");
+        setResults([]);
+        return;
+      }
+
+      if (data.error) {
+        console.error("Search function error:", data.error);
+        throw new Error(data.error);
+      }
+
+      if (!data.results) {
+        console.warn("Search returned no results property");
         setResults([]);
         return;
       }

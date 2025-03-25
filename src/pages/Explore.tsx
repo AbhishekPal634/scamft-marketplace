@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -7,10 +8,8 @@ import {
   X, 
   ChevronDown, 
   SlidersHorizontal,
-  Search
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
@@ -33,14 +32,15 @@ import {
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import NFTCard from "@/components/nft/NFTCard";
-import SearchBar from "@/components/search/SearchBar";
 import { useNFTStore, NFTFilters, NFT } from "@/services/nftService";
 import { searchNFTsByText } from "@/services/searchService";
+import { useSearch } from "@/hooks/useSearch";
 
 const Explore = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { nfts, fetchMarketplaceNFTs, filterNFTs } = useNFTStore();
+  const { search, results: searchResults, isLoading: isSearching } = useSearch();
   
   const [filteredNFTs, setFilteredNFTs] = useState<NFT[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,22 +49,23 @@ const Explore = () => {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
   const [sortOption, setSortOption] = useState<string>("recent");
   const [activeTags, setActiveTags] = useState<string[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
   
   // Extract query parameters on page load
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const category = params.get("category");
-    const search = params.get("search");
+    const searchParam = params.get("search");
     
     if (category) {
       setActiveCategory(category.toLowerCase());
     }
     
-    if (search) {
-      setSearchQuery(search);
+    if (searchParam) {
+      setSearchQuery(searchParam);
+      // Trigger search if we have a search parameter
+      search(searchParam);
     }
-  }, [location.search]);
+  }, [location.search, search]);
   
   // Fetch NFTs and apply initial filters
   useEffect(() => {
@@ -75,14 +76,8 @@ const Explore = () => {
       let data = nfts.length > 0 ? nfts : await fetchMarketplaceNFTs();
       
       if (searchQuery) {
-        setIsSearching(true);
-        try {
-          data = await searchNFTsByText(searchQuery);
-        } catch (error) {
-          console.error("Search error:", error);
-        } finally {
-          setIsSearching(false);
-        }
+        // Use the search results if we have a search query
+        data = searchResults.length > 0 ? searchResults : await searchNFTsByText(searchQuery);
       } else {
         // Apply filters from URL if no search query
         const filters: NFTFilters = {
@@ -109,6 +104,7 @@ const Explore = () => {
     fetchMarketplaceNFTs, 
     activeCategory, 
     searchQuery,
+    searchResults,
     location.search
   ]);
   
@@ -174,24 +170,13 @@ const Explore = () => {
   
   const handleClearFilters = () => {
     setActiveCategory("all");
-    setPriceRange([0, 2]);
+    setPriceRange([0, 1000]);
     setSortOption("recent");
     setActiveTags([]);
     setSearchQuery("");
     
     // Clear URL params
     navigate("/explore", { replace: true });
-  };
-  
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const params = new URLSearchParams();
-    if (searchQuery) {
-      params.set("search", searchQuery);
-    }
-    
-    navigate({ search: params.toString() }, { replace: true });
   };
   
   // All available categories
@@ -230,7 +215,7 @@ const Explore = () => {
     <div className="flex flex-col min-h-screen">
       <Navbar />
       
-      <main className="flex-grow pt-16 pb-16">
+      <main className="flex-grow pt-12 pb-16">
         <div className="page-container">
           {/* Page Header */}
           <div className="mb-8">
@@ -240,27 +225,8 @@ const Explore = () => {
             </p>
           </div>
           
-          {/* Search and Filter Controls */}
+          {/* Filter Controls */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-            <div className="w-full md:w-auto">
-              <form onSubmit={handleSearch} className="relative flex">
-                <Input
-                  type="search"
-                  placeholder="Search NFTs..."
-                  className="w-full md:w-80 rounded-l-full bg-secondary/60 border-none focus:ring-primary pr-12"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                <Button 
-                  type="submit"
-                  className="rounded-r-full"
-                >
-                  <Search className="h-4 w-4 mr-2" />
-                  Search
-                </Button>
-              </form>
-            </div>
-            
             <div className="flex items-center gap-2 w-full md:w-auto">
               {/* Sort Dropdown */}
               <Select 
@@ -326,6 +292,7 @@ const Explore = () => {
                             step={10}
                             value={priceRange}
                             onValueChange={(value) => setPriceRange(value as [number, number])}
+                            className="[&>[data-state=active]]:bg-primary"
                           />
                           <div className="flex justify-between text-sm">
                             <span>${priceRange[0]}</span>
@@ -424,6 +391,7 @@ const Explore = () => {
                     step={10}
                     value={priceRange}
                     onValueChange={(value) => setPriceRange(value as [number, number])}
+                    className="[&>[data-state=active]]:bg-primary"
                   />
                   <div className="flex justify-between text-sm">
                     <span>${priceRange[0]}</span>
