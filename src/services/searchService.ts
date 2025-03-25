@@ -8,19 +8,23 @@ export const searchNFTsByText = async (query: string): Promise<NFT[]> => {
   try {
     console.log("Searching for NFTs with query:", query);
     
-    // Create a controller to allow timeout cancellation
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-    
-    const { data, error } = await supabase.functions.invoke('search-nfts', {
-      body: { query, limit: 20 },
-      signal: controller.signal
+    // Create a timeout promise
+    const timeoutPromise = new Promise<{ error: string }>((_, reject) => {
+      setTimeout(() => reject(new Error('Search timeout')), 10000);
     });
     
-    clearTimeout(timeoutId);
-
-    if (error) {
-      console.error("Search error:", error);
+    const searchPromise = supabase.functions.invoke('search-nfts', {
+      body: { query, limit: 20 },
+      headers: {
+        "Content-Type": "application/json"
+      }
+    });
+    
+    // Race between the search and the timeout
+    const response = await Promise.race([searchPromise, timeoutPromise]);
+    
+    if ('error' in response) {
+      console.error("Search error:", response.error);
       toast({
         title: "Search Failed",
         description: "Using local search as fallback",
@@ -31,6 +35,8 @@ export const searchNFTsByText = async (query: string): Promise<NFT[]> => {
       return fallbackLocalSearch(query);
     }
 
+    const data = response;
+    
     if (!data || !data.results) {
       console.warn("Search returned no data or results property");
       return fallbackLocalSearch(query);
@@ -112,24 +118,30 @@ export const findSimilarNFTs = async (nftId: string, limit = 4): Promise<NFT[]> 
     if (nft.embedding) {
       console.log("Finding similar NFTs using embedding");
       
-      // Create a controller to allow timeout cancellation
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      // Create a timeout promise
+      const timeoutPromise = new Promise<{ error: string }>((_, reject) => {
+        setTimeout(() => reject(new Error('Search timeout')), 10000);
+      });
       
-      const { data, error } = await supabase.functions.invoke('search-nfts', {
+      const searchPromise = supabase.functions.invoke('search-nfts', {
         body: { 
           embedding: nft.embedding,
           limit: limit + 1 // Request one more so we can filter out the current NFT
         },
-        signal: controller.signal
+        headers: {
+          "Content-Type": "application/json"
+        }
       });
       
-      clearTimeout(timeoutId);
+      // Race between the search and the timeout
+      const response = await Promise.race([searchPromise, timeoutPromise]);
       
-      if (error) {
-        console.error("Search error:", error);
-        throw error;
+      if ('error' in response) {
+        console.error("Search error:", response.error);
+        throw new Error(response.error);
       }
+      
+      const data = response;
       
       // Filter out the current NFT and any unlisted NFTs
       const similarNfts = data?.results

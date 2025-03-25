@@ -21,34 +21,33 @@ export const useSearch = () => {
     try {
       console.log("Searching for:", query);
       
-      // Create a controller to allow timeout cancellation
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      // Create a timeout promise
+      const timeoutPromise = new Promise<{ error: string }>((_, reject) => {
+        setTimeout(() => reject(new Error('Search timeout')), 10000);
+      });
       
-      const { data, error: supabaseError } = await supabase.functions.invoke('search-nfts', {
+      const searchPromise = supabase.functions.invoke('search-nfts', {
         body: { query },
         headers: {
           "Content-Type": "application/json"
-        },
-        signal: controller.signal
+        }
       });
       
-      clearTimeout(timeoutId);
-
-      if (supabaseError) {
-        console.error("Search error:", supabaseError);
-        throw new Error(supabaseError.message || "Search failed");
+      // Race between the search and the timeout
+      const response = await Promise.race([searchPromise, timeoutPromise]);
+      
+      // Check if response has an error property from our edge function
+      if ('error' in response) {
+        console.error("Search function error:", response.error);
+        throw new Error(response.error);
       }
 
+      const data = response;
+      
       if (!data) {
         console.warn("Search returned no data");
         setResults([]);
         return;
-      }
-
-      if (data.error) {
-        console.error("Search function error:", data.error);
-        throw new Error(data.error);
       }
 
       if (!data.results) {

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -24,6 +25,7 @@ import {
   SheetTitle,
   SheetDescription,
   SheetClose,
+  SheetTrigger,
 } from "@/components/ui/sheet";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
