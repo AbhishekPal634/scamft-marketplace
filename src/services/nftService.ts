@@ -108,7 +108,43 @@ const mapDbNftToNft = async (dbNft: any): Promise<NFT> => {
   };
 };
 
-const mapDbPurchaseToFrontend = (purchase: any, purchaseItems: any[]): Purchase => {
+// Fix the purchase mapping function to ensure no promises in the output
+const mapDbPurchaseToFrontend = async (purchase: any, purchaseItems: any[]): Promise<Purchase> => {
+  // Process all NFTs first to resolve promises
+  const processedItems = await Promise.all(
+    purchaseItems.map(async (item) => {
+      // If item.nft exists, map it through our mapper, otherwise create a placeholder
+      const nftData = item.nft 
+        ? await mapDbNftToNft(item.nft)
+        : {
+            id: item.nft_id,
+            title: 'Unknown NFT',
+            description: '',
+            price: parseFloat(item.price_per_item) || 0,
+            image: '/placeholder.svg',
+            image_url: '/placeholder.svg',
+            creator: { id: '0', name: 'Unknown', avatar: '/placeholder.svg' },
+            createdAt: new Date().toISOString(),
+            tags: [],
+            category: 'Art',
+            editions: { total: 1, available: 1 },
+            likes: 0,
+            isLiked: false,
+            listed: false,
+            owner_id: purchase.user_id,
+          };
+      
+      return {
+        id: item.id,
+        purchase_id: item.purchase_id,
+        nft_id: item.nft_id,
+        quantity: item.quantity || 1,
+        price_per_item: parseFloat(item.price_per_item) || 0,
+        nft: nftData,
+      };
+    })
+  );
+
   return {
     id: purchase.id,
     user_id: purchase.user_id,
@@ -116,14 +152,7 @@ const mapDbPurchaseToFrontend = (purchase: any, purchaseItems: any[]): Purchase 
     status: purchase.status || 'completed',
     created_at: purchase.created_at || new Date().toISOString(),
     stripe_payment_id: purchase.stripe_payment_id,
-    items: purchaseItems.map(item => ({
-      id: item.id,
-      purchase_id: item.purchase_id,
-      nft_id: item.nft_id,
-      quantity: item.quantity || 1,
-      price_per_item: parseFloat(item.price_per_item) || 0,
-      nft: item.nft ? mapDbNftToNft(item.nft) : {} as NFT,
-    })),
+    items: processedItems,
   };
 };
 
@@ -263,7 +292,9 @@ export const useNFTStore = create<NFTStore>((set, get) => ({
           continue;
         }
         
-        purchases.push(mapDbPurchaseToFrontend(purchase, itemsData));
+        // Use await here to resolve the promises
+        const mappedPurchase = await mapDbPurchaseToFrontend(purchase, itemsData);
+        purchases.push(mappedPurchase);
       }
       
       return purchases;

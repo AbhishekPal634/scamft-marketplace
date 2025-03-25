@@ -71,6 +71,8 @@ const MyListings = () => {
           likes: nft.likes || 0,
           views: nft.views || 0,
           isLiked: false,
+          listed: nft.listed !== false, // Add the listed property with default true if not specified
+          owner_id: nft.owner_id || nft.creator_id, // Add owner_id property
         }));
         
         setMyNfts(mappedNfts);
