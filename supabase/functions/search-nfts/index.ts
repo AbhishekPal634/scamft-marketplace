@@ -22,7 +22,20 @@ serve(async (req) => {
 
   try {
     // Get the request data
-    const requestBody = await req.json();
+    const requestText = await req.text();
+    let requestBody;
+    
+    try {
+      // Safely parse the request body
+      requestBody = requestText ? JSON.parse(requestText) : {};
+    } catch (parseError) {
+      console.error("Failed to parse request body:", parseError, "Request text:", requestText);
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON in request body" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
     const { query, embedding, limit = 10 } = requestBody;
 
     console.log(`Search request received: ${query ? `query: ${query}` : "embedding search"}, limit: ${limit}`);
@@ -38,23 +51,27 @@ serve(async (req) => {
     // Text search fallback function
     const performTextSearch = async () => {
       console.log("Performing text search");
-      const { data: textSearchResults, error: textSearchError } = await supabase
-        .from('nfts')
-        .select('*')
-        .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
-        .eq('listed', true)
-        .limit(limit);
-      
-      if (textSearchError) {
-        console.error("Text search error:", textSearchError);
-        throw new Error(`Text search failed: ${textSearchError.message}`);
+      try {
+        const { data: textSearchResults, error: textSearchError } = await supabase
+          .from('nfts')
+          .select('*')
+          .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
+          .limit(limit);
+        
+        if (textSearchError) {
+          console.error("Text search error:", textSearchError);
+          throw new Error(`Text search failed: ${textSearchError.message}`);
+        }
+        
+        console.log(`Text search found ${textSearchResults?.length || 0} results`);
+        return textSearchResults || [];
+      } catch (error) {
+        console.error("Error in text search:", error);
+        return [];
       }
-      
-      console.log(`Text search found ${textSearchResults.length} results`);
-      return textSearchResults;
     };
 
-    // If Gemini API key is not configured, fall back to text search
+    // Fallback to text search if Gemini API key is not configured or if we encounter errors
     if (!geminiApiKey && query) {
       console.log("Gemini API key not configured, falling back to text search");
       const results = await performTextSearch();
@@ -66,7 +83,7 @@ serve(async (req) => {
 
     let queryEmbedding = embedding;
 
-    // If we have a text query and no embedding, generate an embedding
+    // If we have a text query and no embedding, try to generate an embedding
     if (query && !embedding) {
       try {
         console.log("Generating embedding for query:", query);
@@ -118,71 +135,63 @@ serve(async (req) => {
       }
     }
 
-    // If we have an embedding, perform vector search
+    // If we have an embedding, try vector search
     if (queryEmbedding) {
       try {
-        // Call the match_nfts function with the embedding
-        console.log("Calling match_nfts function");
-        const { data: nfts, error } = await supabase.rpc(
-          'match_nfts',
-          {
-            query_embedding: queryEmbedding,
-            match_threshold: 0.5,
-            match_count: limit * 2 // Get extra results to filter listed ones
-          }
-        );
+        // Check if match_nfts function exists
+        try {
+          // Call the match_nfts function with the embedding
+          console.log("Calling match_nfts function");
+          const { data: nfts, error } = await supabase.rpc(
+            'match_nfts',
+            {
+              query_embedding: queryEmbedding,
+              match_threshold: 0.5,
+              match_count: limit
+            }
+          );
 
-        if (error) {
-          console.error("Error calling match_nfts:", error);
-          // Fall back to text search if vector search fails
-          if (query) {
+          if (error) {
+            console.error("Error calling match_nfts:", error);
+            throw error;
+          }
+
+          console.log(`Vector search found ${nfts?.length || 0} results`);
+          
+          // If no results from vector search and we have a query, try text search
+          if ((!nfts || nfts.length === 0) && query) {
+            console.log("No vector search results, falling back to text search");
             const results = await performTextSearch();
             return new Response(
               JSON.stringify({ results }),
               { headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
           }
-          throw new Error(`Failed to search NFTs: ${error.message}`);
-        }
-
-        console.log(`Vector search found ${nfts?.length || 0} initial results`);
-
-        // If no results from vector search and we have a query, try text search
-        if ((!nfts || nfts.length === 0) && query) {
-          console.log("No vector search results, falling back to text search");
-          const results = await performTextSearch();
+          
           return new Response(
-            JSON.stringify({ results }),
+            JSON.stringify({ results: nfts || [] }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
+        } catch (rpcError) {
+          console.error("RPC error, match_nfts might not exist:", rpcError);
+          throw rpcError;
         }
-
-        // Filter results to only show NFTs that are listed for sale
-        const { data: listedNftIds } = await supabase
-          .from('nfts')
-          .select('id')
-          .eq('listed', true)
-          .in('id', nfts.map(nft => nft.id));
-
-        const listedIdSet = new Set(listedNftIds?.map(item => item.id) || []);
-        const listedResults = nfts.filter(nft => listedIdSet.has(nft.id)).slice(0, limit);
-
-        console.log(`Returning ${listedResults.length} final results`);
-        return new Response(
-          JSON.stringify({ results: listedResults }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
       } catch (error) {
         console.error("Vector search error:", error);
         // Fall back to text search if vector search fails and we have a query
         if (query) {
+          console.log("Vector search failed, falling back to text search");
           const results = await performTextSearch();
           return new Response(
             JSON.stringify({ results }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
-        throw error;
+        
+        return new Response(
+          JSON.stringify({ error: "Vector search failed", details: error.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
     } else if (query) {
       // If we don't have an embedding but have a query, perform text search

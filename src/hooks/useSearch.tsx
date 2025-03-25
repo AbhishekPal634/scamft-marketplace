@@ -20,12 +20,20 @@ export const useSearch = () => {
 
     try {
       console.log("Searching for:", query);
+      
+      // Create a controller to allow timeout cancellation
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
       const { data, error: supabaseError } = await supabase.functions.invoke('search-nfts', {
         body: { query },
         headers: {
           "Content-Type": "application/json"
-        }
+        },
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
 
       if (supabaseError) {
         console.error("Search error:", supabaseError);
@@ -83,11 +91,17 @@ export const useSearch = () => {
       console.error("Search error:", err);
       const errorMessage = err.message || "Failed to search NFTs";
       setError(errorMessage);
-      toast({
-        title: "Search Failed",
-        description: errorMessage,
-        variant: "destructive"
-      });
+      
+      // Only show toast for non-abort errors
+      if (err.name !== 'AbortError') {
+        toast({
+          title: "Search Failed",
+          description: "Using local search as fallback",
+          variant: "destructive"
+        });
+      }
+      
+      // Fallback to empty results - we'll rely on the Explore page's default behavior
       setResults([]);
     } finally {
       setIsLoading(false);

@@ -1,12 +1,11 @@
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, Loader2, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import BlurImage from "@/components/ui/BlurImage";
-import { useNFTStore, NFT } from "@/services/nftService";
 import { useSearch } from "@/hooks/useSearch";
 
 interface SearchBarProps {
@@ -152,7 +151,7 @@ const SearchBar = ({ fullWidth = false, autoFocus = false, className = "" }: Sea
               </div>
             ) : error ? (
               <div className="py-6 text-center">
-                <p className="text-red-500 mb-2">Error: {error}</p>
+                <p className="text-red-500 mb-2">Unable to search</p>
                 <Button 
                   variant="outline" 
                   size="sm" 

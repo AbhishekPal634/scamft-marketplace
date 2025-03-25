@@ -7,23 +7,33 @@ import { toast } from "@/components/ui/use-toast";
 export const searchNFTsByText = async (query: string): Promise<NFT[]> => {
   try {
     console.log("Searching for NFTs with query:", query);
+    
+    // Create a controller to allow timeout cancellation
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
     const { data, error } = await supabase.functions.invoke('search-nfts', {
-      body: { query, limit: 20 }
+      body: { query, limit: 20 },
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
 
     if (error) {
       console.error("Search error:", error);
       toast({
         title: "Search Failed",
-        description: "An error occurred while searching. Please try again.",
+        description: "Using local search as fallback",
         variant: "destructive"
       });
-      throw error;
+      
+      // Fallback to local search
+      return fallbackLocalSearch(query);
     }
 
     if (!data || !data.results) {
       console.warn("Search returned no data or results property");
-      return [];
+      return fallbackLocalSearch(query);
     }
 
     console.log(`Search returned ${data.results.length} results`);
@@ -59,20 +69,33 @@ export const searchNFTsByText = async (query: string): Promise<NFT[]> => {
   } catch (error) {
     console.error("Search error:", error);
     
-    // Fallback to local search if edge function fails
-    const store = useNFTStore.getState();
-    const allNFTs = store.nfts.length > 0 
-      ? store.nfts.filter(nft => nft.listed !== false)
-      : (await store.fetchMarketplaceNFTs());
-    
-    // Simple text search
-    return allNFTs.filter(nft => 
-      nft.title.toLowerCase().includes(query.toLowerCase()) ||
-      nft.description?.toLowerCase().includes(query.toLowerCase()) ||
-      nft.tags?.some(tag => tag.toLowerCase().includes(query.toLowerCase())) ||
-      nft.category?.toLowerCase().includes(query.toLowerCase())
-    );
+    return fallbackLocalSearch(query);
   }
+};
+
+// Local search fallback when edge function search fails
+const fallbackLocalSearch = async (query: string): Promise<NFT[]> => {
+  console.log("Using local search as fallback");
+  
+  // Use the store's data
+  const store = useNFTStore.getState();
+  const allNFTs = store.nfts.length > 0 
+    ? store.nfts.filter(nft => nft.listed !== false)
+    : (await store.fetchMarketplaceNFTs());
+  
+  // Simple text search
+  const searchTerms = query.toLowerCase().split(' ');
+  
+  return allNFTs.filter(nft => {
+    const titleMatch = nft.title.toLowerCase().includes(query.toLowerCase());
+    const descMatch = nft.description?.toLowerCase().includes(query.toLowerCase());
+    const tagMatch = nft.tags?.some(tag => 
+      searchTerms.some(term => tag.toLowerCase().includes(term))
+    );
+    const categoryMatch = nft.category?.toLowerCase().includes(query.toLowerCase());
+    
+    return titleMatch || descMatch || tagMatch || categoryMatch;
+  });
 };
 
 // Find similar NFTs to a given NFT
@@ -88,12 +111,20 @@ export const findSimilarNFTs = async (nftId: string, limit = 4): Promise<NFT[]> 
     // If NFT has embedding, try to use vector search
     if (nft.embedding) {
       console.log("Finding similar NFTs using embedding");
+      
+      // Create a controller to allow timeout cancellation
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
       const { data, error } = await supabase.functions.invoke('search-nfts', {
         body: { 
           embedding: nft.embedding,
           limit: limit + 1 // Request one more so we can filter out the current NFT
-        }
+        },
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
       
       if (error) {
         console.error("Search error:", error);

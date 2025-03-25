@@ -1,16 +1,13 @@
-
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { 
   Filter, 
   ArrowUpDown, 
   X, 
-  ChevronDown, 
   SlidersHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -23,10 +20,9 @@ import {
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
+  SheetDescription,
   SheetClose,
 } from "@/components/ui/sheet";
 import Navbar from "@/components/layout/Navbar";
@@ -34,13 +30,11 @@ import Footer from "@/components/layout/Footer";
 import NFTCard from "@/components/nft/NFTCard";
 import { useNFTStore, NFTFilters, NFT } from "@/services/nftService";
 import { searchNFTsByText } from "@/services/searchService";
-import { useSearch } from "@/hooks/useSearch";
 
 const Explore = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { nfts, fetchMarketplaceNFTs, filterNFTs } = useNFTStore();
-  const { search, results: searchResults, isLoading: isSearching } = useSearch();
   
   const [filteredNFTs, setFilteredNFTs] = useState<NFT[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,10 +56,8 @@ const Explore = () => {
     
     if (searchParam) {
       setSearchQuery(searchParam);
-      // Trigger search if we have a search parameter
-      search(searchParam);
     }
-  }, [location.search, search]);
+  }, [location.search]);
   
   // Fetch NFTs and apply initial filters
   useEffect(() => {
@@ -76,8 +68,8 @@ const Explore = () => {
       let data = nfts.length > 0 ? nfts : await fetchMarketplaceNFTs();
       
       if (searchQuery) {
-        // Use the search results if we have a search query
-        data = searchResults.length > 0 ? searchResults : await searchNFTsByText(searchQuery);
+        // Use search results if we have a search query
+        data = await searchNFTsByText(searchQuery);
       } else {
         // Apply filters from URL if no search query
         const filters: NFTFilters = {
@@ -104,13 +96,12 @@ const Explore = () => {
     fetchMarketplaceNFTs, 
     activeCategory, 
     searchQuery,
-    searchResults,
     location.search
   ]);
   
   // Apply filters whenever filter settings change
   useEffect(() => {
-    if (loading || isSearching || searchQuery) return;
+    if (loading || searchQuery) return;
     
     const filters: NFTFilters = {
       sortBy: sortOption as any,
@@ -145,7 +136,6 @@ const Explore = () => {
     filterNFTs, 
     navigate,
     loading,
-    isSearching,
     searchQuery
   ]);
   
@@ -480,19 +470,19 @@ const Explore = () => {
               {/* Results Count */}
               <div className="mb-6">
                 <p className="text-sm text-muted-foreground">
-                  {loading || isSearching
-                    ? "Searching..."
+                  {loading
+                    ? "Loading..."
                     : `Showing ${filteredNFTs.length} results`}
                 </p>
               </div>
               
               {/* Loading State */}
-              {(loading || isSearching) ? (
+              {loading ? (
                 <div className="min-h-[300px] flex items-center justify-center">
                   <div className="text-center">
                     <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
                     <p className="mt-4 text-muted-foreground">
-                      {isSearching ? "Searching NFTs..." : "Loading NFTs..."}
+                      Loading NFTs...
                     </p>
                   </div>
                 </div>
