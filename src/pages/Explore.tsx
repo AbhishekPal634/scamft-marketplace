@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -244,21 +243,20 @@ const Explore = () => {
           {/* Search and Filter Controls */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
             <div className="w-full md:w-auto">
-              <form onSubmit={handleSearch} className="relative">
+              <form onSubmit={handleSearch} className="relative flex">
                 <Input
                   type="search"
                   placeholder="Search NFTs..."
-                  className="w-full md:w-80 rounded-full bg-secondary/60 border-none focus:ring-primary pr-12"
+                  className="w-full md:w-80 rounded-l-full bg-secondary/60 border-none focus:ring-primary pr-12"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
                 <Button 
                   type="submit"
-                  size="icon"
-                  variant="ghost"
-                  className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8"
+                  className="rounded-r-full"
                 >
-                  <Search className="h-4 w-4" />
+                  <Search className="h-4 w-4 mr-2" />
+                  Search
                 </Button>
               </form>
             </div>

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import BlurImage from "@/components/ui/BlurImage";
 import { useNFTStore, NFT } from "@/services/nftService";
-import { searchNFTsByText } from "@/services/searchService";
+import { useSearch } from "@/hooks/useSearch";
 
 interface SearchBarProps {
   fullWidth?: boolean;
@@ -17,13 +17,13 @@ interface SearchBarProps {
 
 const SearchBar = ({ fullWidth = false, autoFocus = false, className = "" }: SearchBarProps) => {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<NFT[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
+  
+  const { search, results, isLoading, error } = useSearch();
   
   // Clear search when changing routes
   useEffect(() => {
@@ -58,52 +58,30 @@ const SearchBar = ({ fullWidth = false, autoFocus = false, className = "" }: Sea
   }, []);
   
   // Debounced search function
-  const debouncedSearch = useCallback(
-    (value: string) => {
-      if (value.trim().length < 2) {
-        setResults([]);
-        setIsSearching(false);
-        return;
-      }
-      
-      setIsSearching(true);
-      
-      const search = async () => {
-        try {
-          const searchResults = await searchNFTsByText(value);
-          setResults(searchResults);
-        } catch (error) {
-          console.error("Search error:", error);
-        } finally {
-          setIsSearching(false);
-        }
-      };
-      
-      search();
-    },
-    []
-  );
-  
-  // Handle input change with debounce
   useEffect(() => {
     if (!query.trim()) {
-      setResults([]);
-      setIsSearching(false);
+      setShowResults(false);
       return;
     }
     
     const timer = setTimeout(() => {
-      debouncedSearch(query);
+      if (query.trim().length >= 2) {
+        search(query);
+        setShowResults(true);
+      }
     }, 300);
     
     return () => clearTimeout(timer);
-  }, [query, debouncedSearch]);
+  }, [query, search]);
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (query.trim()) {
-      navigate(`/explore?search=${encodeURIComponent(query.trim())}`);
-      setShowResults(false);
+      search(query);
+      if (query.trim().length >= 2) {
+        navigate(`/explore?search=${encodeURIComponent(query.trim())}`);
+        setShowResults(false);
+      }
     }
   };
   
@@ -114,20 +92,19 @@ const SearchBar = ({ fullWidth = false, autoFocus = false, className = "" }: Sea
   
   return (
     <div className={`relative ${className}`}>
-      <form onSubmit={handleSubmit} className="relative">
+      <form onSubmit={handleSubmit} className="relative flex">
         <Input
           ref={inputRef}
           type="search"
           placeholder="Search for NFTs, collections, or artists..."
-          className={`${fullWidth ? "w-full" : "w-64 md:w-80 lg:w-96"} rounded-full bg-secondary/70 border-none focus:ring-primary pr-10`}
+          className={`${fullWidth ? "w-full" : "w-64 md:w-80 lg:w-96"} rounded-l-full bg-secondary/70 border-none focus:ring-primary pr-10`}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
-            setShowResults(true);
           }}
-          onFocus={() => query.trim() && setShowResults(true)}
+          onFocus={() => query.trim().length >= 2 && setShowResults(true)}
         />
-        <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center">
+        <div className="absolute right-16 top-1/2 transform -translate-y-1/2 flex items-center">
           {query && (
             <Button
               type="button"
@@ -143,33 +120,50 @@ const SearchBar = ({ fullWidth = false, autoFocus = false, className = "" }: Sea
             </Button>
           )}
           
-          {isSearching ? (
+          {isLoading ? (
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           ) : (
             <Search className="h-4 w-4 text-muted-foreground" />
           )}
         </div>
+        <Button 
+          type="submit" 
+          className="rounded-r-full"
+        >
+          Search
+        </Button>
       </form>
       
       {/* Search Results */}
       <AnimatePresence>
-        {showResults && (query.trim().length > 1) && (
+        {showResults && (query.trim().length >= 2) && (
           <motion.div
             ref={resultsRef}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 10 }}
             transition={{ duration: 0.2 }}
-            className="absolute left-0 right-0 mt-2 p-2 rounded-lg glass shadow-lg z-50 border border-border max-h-[70vh] overflow-y-auto"
+            className="absolute left-0 right-0 mt-2 p-2 rounded-lg glass shadow-lg z-50 border border-border max-h-[70vh] overflow-y-auto bg-background"
           >
-            {isSearching ? (
+            {isLoading ? (
               <div className="py-8 text-center">
                 <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />
                 <p className="mt-2 text-muted-foreground text-sm">Searching...</p>
               </div>
+            ) : error ? (
+              <div className="py-6 text-center">
+                <p className="text-red-500 mb-2">Error: {error}</p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => search(query)}
+                >
+                  Try Again
+                </Button>
+              </div>
             ) : results.length > 0 ? (
               <div className="space-y-2">
-                {results.map((nft) => (
+                {results.slice(0, 5).map((nft) => (
                   <div
                     key={nft.id}
                     className="flex items-center gap-3 p-2 hover:bg-secondary/60 rounded-md cursor-pointer transition-colors"
@@ -187,7 +181,7 @@ const SearchBar = ({ fullWidth = false, autoFocus = false, className = "" }: Sea
                       <p className="text-xs text-muted-foreground truncate">
                         by {nft.creator.name}
                       </p>
-                      <div className="text-xs font-medium mt-0.5">{nft.price} ETH</div>
+                      <div className="text-xs font-medium mt-0.5">${nft.price.toFixed(2)} USD</div>
                     </div>
                   </div>
                 ))}
@@ -198,11 +192,11 @@ const SearchBar = ({ fullWidth = false, autoFocus = false, className = "" }: Sea
                     className="text-xs"
                     onClick={() => navigate(`/explore?search=${encodeURIComponent(query.trim())}`)}
                   >
-                    View all results
+                    View all {results.length} results
                   </Button>
                 </div>
               </div>
-            ) : query.trim().length > 1 ? (
+            ) : query.trim().length >= 2 ? (
               <div className="py-6 text-center">
                 <p className="text-muted-foreground">No results found for "{query}"</p>
                 <Button 

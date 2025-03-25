@@ -22,57 +22,102 @@ serve(async (req) => {
 
   try {
     // Get the request data
-    const { query, limit = 10 } = await req.json();
+    const requestBody = await req.json();
+    const { query, embedding, limit = 10 } = requestBody;
 
-    if (!query) {
+    console.log(`Search request received: ${query ? `query: ${query}` : "embedding search"}, limit: ${limit}`);
+
+    if (!query && !embedding) {
+      console.error("Missing query or embedding parameter");
       return new Response(
-        JSON.stringify({ error: "Missing query parameter" }),
+        JSON.stringify({ error: "Missing query or embedding parameter" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    if (!geminiApiKey) {
+    if (!geminiApiKey && query) {
+      console.error("Gemini API key not configured");
       return new Response(
         JSON.stringify({ error: "Gemini API key not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Generate embeddings for the search query using Gemini
-    const embeddingResponse = await fetch(`https://generativelanguage.googleapis.com/v1/models/embedding-001:embedContent?key=${geminiApiKey}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "embedding-001",
-        content: {
-          parts: [{ text: query.substring(0, 8191) }] // Text limit
-        }
-      })
-    });
+    let queryEmbedding = embedding;
 
-    if (!embeddingResponse.ok) {
-      const errorData = await embeddingResponse.json();
-      throw new Error(`Gemini API error: ${JSON.stringify(errorData)}`);
+    // If we have a text query and no embedding, generate an embedding
+    if (query && !embedding) {
+      try {
+        console.log("Generating embedding for query:", query);
+        const embeddingResponse = await fetch(`https://generativelanguage.googleapis.com/v1/models/embedding-001:embedContent?key=${geminiApiKey}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: "embedding-001",
+            content: {
+              parts: [{ text: query.substring(0, 8191) }] // Text limit
+            }
+          })
+        });
+
+        if (!embeddingResponse.ok) {
+          const errorData = await embeddingResponse.json();
+          console.error("Gemini API error:", JSON.stringify(errorData));
+          throw new Error(`Gemini API error: ${JSON.stringify(errorData)}`);
+        }
+
+        const data = await embeddingResponse.json();
+        queryEmbedding = data.embedding.values;
+        console.log("Embedding generated successfully");
+      } catch (error) {
+        console.error("Error generating embedding:", error);
+        
+        // Fall back to text search if embedding generation fails
+        try {
+          console.log("Falling back to text search");
+          const { data: textSearchResults, error: textSearchError } = await supabase
+            .from('nfts')
+            .select('*')
+            .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
+            .eq('listed', true)
+            .limit(limit);
+          
+          if (textSearchError) throw textSearchError;
+          
+          console.log(`Text search found ${textSearchResults.length} results`);
+          return new Response(
+            JSON.stringify({ results: textSearchResults }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        } catch (fallbackError) {
+          console.error("Fallback text search error:", fallbackError);
+          return new Response(
+            JSON.stringify({ error: "Search failed. Please try again later." }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
     }
 
-    const data = await embeddingResponse.json();
-    const embedding = data.embedding.values;
-
-    // Call the match_nfts function
+    // Call the match_nfts function with the embedding
+    console.log("Calling match_nfts function");
     const { data: nfts, error } = await supabase.rpc(
       'match_nfts',
       {
-        query_embedding: embedding,
+        query_embedding: queryEmbedding,
         match_threshold: 0.5,
         match_count: limit * 2 // Get extra results to filter listed ones
       }
     );
 
     if (error) {
+      console.error("Error calling match_nfts:", error);
       throw new Error(`Failed to search NFTs: ${error.message}`);
     }
+
+    console.log(`Vector search found ${nfts.length} initial results`);
 
     // Filter results to only show NFTs that are listed for sale
     const { data: listedNftIds } = await supabase
@@ -84,6 +129,7 @@ serve(async (req) => {
     const listedIdSet = new Set(listedNftIds?.map(item => item.id) || []);
     const listedResults = nfts.filter(nft => listedIdSet.has(nft.id)).slice(0, limit);
 
+    console.log(`Returning ${listedResults.length} final results`);
     return new Response(
       JSON.stringify({ results: listedResults }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
