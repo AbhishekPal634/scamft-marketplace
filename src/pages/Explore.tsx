@@ -41,13 +41,13 @@ import { searchNFTsByText } from "@/services/searchService";
 const Explore = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { nfts, fetchNFTs, filterNFTs } = useNFTStore();
+  const { nfts, fetchMarketplaceNFTs, filterNFTs } = useNFTStore();
   
   const [filteredNFTs, setFilteredNFTs] = useState<NFT[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("all");
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 2]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
   const [sortOption, setSortOption] = useState<string>("recent");
   const [activeTags, setActiveTags] = useState<string[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -72,7 +72,8 @@ const Explore = () => {
     const initializeData = async () => {
       setLoading(true);
       
-      let data = nfts.length > 0 ? nfts : await fetchNFTs();
+      // Always fetch marketplace NFTs (only those listed for sale)
+      let data = nfts.length > 0 ? nfts : await fetchMarketplaceNFTs();
       
       if (searchQuery) {
         setIsSearching(true);
@@ -106,7 +107,7 @@ const Explore = () => {
     initializeData();
   }, [
     nfts, 
-    fetchNFTs, 
+    fetchMarketplaceNFTs, 
     activeCategory, 
     searchQuery,
     location.search
@@ -230,7 +231,7 @@ const Explore = () => {
     <div className="flex flex-col min-h-screen">
       <Navbar />
       
-      <main className="flex-grow pt-24 pb-16">
+      <main className="flex-grow pt-16 pb-16">
         <div className="page-container">
           {/* Page Header */}
           <div className="mb-8">
@@ -319,18 +320,18 @@ const Explore = () => {
                       
                       {/* Mobile Price Range */}
                       <div>
-                        <h3 className="font-medium mb-3">Price Range (ETH)</h3>
+                        <h3 className="font-medium mb-3">Price Range (USD)</h3>
                         <div className="space-y-5">
                           <Slider
-                            defaultValue={[0, 2]}
-                            max={2}
-                            step={0.1}
+                            defaultValue={[0, 1000]}
+                            max={1000}
+                            step={10}
                             value={priceRange}
                             onValueChange={(value) => setPriceRange(value as [number, number])}
                           />
                           <div className="flex justify-between text-sm">
-                            <span>{priceRange[0]} ETH</span>
-                            <span>{priceRange[1]} ETH</span>
+                            <span>${priceRange[0]}</span>
+                            <span>${priceRange[1]}</span>
                           </div>
                         </div>
                       </div>
@@ -375,7 +376,7 @@ const Explore = () => {
               
               {/* Clear Filters Button (shown when filters are active) */}
               {(activeCategory !== "all" || activeTags.length > 0 || 
-                priceRange[0] > 0 || priceRange[1] < 2 || searchQuery) && (
+                priceRange[0] > 0 || priceRange[1] < 1000 || searchQuery) && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -417,18 +418,18 @@ const Explore = () => {
               
               {/* Price Range */}
               <div>
-                <h3 className="font-medium mb-3">Price Range</h3>
+                <h3 className="font-medium mb-3">Price Range (USD)</h3>
                 <div className="px-1 space-y-5">
                   <Slider
-                    defaultValue={[0, 2]}
-                    max={2}
-                    step={0.1}
+                    defaultValue={[0, 1000]}
+                    max={1000}
+                    step={10}
                     value={priceRange}
                     onValueChange={(value) => setPriceRange(value as [number, number])}
                   />
                   <div className="flex justify-between text-sm">
-                    <span>{priceRange[0]} ETH</span>
-                    <span>{priceRange[1]} ETH</span>
+                    <span>${priceRange[0]}</span>
+                    <span>${priceRange[1]}</span>
                   </div>
                 </div>
               </div>

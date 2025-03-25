@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -17,12 +18,11 @@ const NFTDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { nfts, loading } = useNFTStore();
+  const { nfts, loading, toggleLike } = useNFTStore();
   const { addItem } = useCartStore();
   const { user } = useAuth();
   
   const [nft, setNft] = useState<NFT | null>(null);
-  const [isLiked, setIsLiked] = useState(false);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   
@@ -55,11 +55,22 @@ const NFTDetail = () => {
   };
   
   const handleLike = () => {
-    setIsLiked(!isLiked);
+    if (!nft) return;
+    
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to like this NFT",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    toggleLike(nft.id);
     
     toast({
-      title: isLiked ? "Removed from favorites" : "Added to favorites",
-      description: isLiked 
+      title: nft.isLiked ? "Removed from favorites" : "Added to favorites",
+      description: nft.isLiked 
         ? `${nft?.title} has been removed from your favorites.`
         : `${nft?.title} has been added to your favorites.`,
     });
@@ -92,6 +103,16 @@ const NFTDetail = () => {
         variant: "destructive",
       });
       navigate("/login");
+      return;
+    }
+    
+    // Check if user owns this NFT
+    if (user.id !== nft.owner_id && user.id !== nft.creator.id) {
+      toast({
+        title: "Permission denied",
+        description: "You must own this NFT to download it.",
+        variant: "destructive",
+      });
       return;
     }
     
@@ -131,7 +152,7 @@ const NFTDetail = () => {
   }
   
   return (
-    <div className="page-container pt-28 pb-16">
+    <div className="page-container pt-20 pb-16">
       <button
         onClick={() => navigate(-1)}
         className="flex items-center text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors"
@@ -167,12 +188,12 @@ const NFTDetail = () => {
                 <h1 className="text-3xl font-medium">{nft.title}</h1>
                 <div className="flex items-center mt-2">
                   <img 
-                    src={nft.creator?.avatar || "https://i.pravatar.cc/150?img=1"} 
+                    src={nft.creator?.avatar || "/placeholder.svg"} 
                     alt={nft.creator?.name || "Creator"}
                     className="w-6 h-6 rounded-full mr-2"
                   />
                   <span className="text-sm text-muted-foreground">
-                    Created by <span className="text-foreground">{nft.creator?.name || "Artist"}</span>
+                    Created by <span className="text-foreground">{nft.creator?.name}</span>
                   </span>
                 </div>
               </div>
@@ -184,7 +205,7 @@ const NFTDetail = () => {
                   className="rounded-full"
                   onClick={handleLike}
                 >
-                  <Heart className={`h-4 w-4 ${isLiked ? 'fill-primary text-primary' : ''}`} />
+                  <Heart className={`h-4 w-4 ${nft.isLiked ? 'fill-primary text-primary' : ''}`} />
                 </Button>
                 <Button
                   variant="outline"
@@ -225,10 +246,7 @@ const NFTDetail = () => {
             <div className="flex justify-between items-center">
               <div>
                 <div className="text-sm text-muted-foreground">Current Price</div>
-                <div className="text-2xl font-medium">{nft.price} ETH</div>
-                <div className="text-sm text-muted-foreground">
-                  ≈ ${(nft.price * 1800).toFixed(2)} USD
-                </div>
+                <div className="text-2xl font-medium">${nft.price.toFixed(2)}</div>
               </div>
               
               <div className="flex gap-3">
@@ -302,13 +320,13 @@ const NFTDetail = () => {
                 <div className="p-4 flex justify-between items-center">
                   <div className="flex items-center">
                     <img 
-                      src={nft.creator?.avatar || "https://i.pravatar.cc/150?img=1"} 
+                      src={nft.creator?.avatar || "/placeholder.svg"} 
                       alt={nft.creator?.name || "Creator"}
                       className="w-8 h-8 rounded-full mr-3"
                     />
                     <div>
                       <div className="font-medium">Minted</div>
-                      <div className="text-sm text-muted-foreground">by {nft.creator?.name || "Artist"}</div>
+                      <div className="text-sm text-muted-foreground">by {nft.creator?.name}</div>
                     </div>
                   </div>
                   <div className="text-right">
@@ -319,13 +337,13 @@ const NFTDetail = () => {
                 <div className="p-4 flex justify-between items-center">
                   <div className="flex items-center">
                     <img 
-                      src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"
-                      alt="User"
+                      src={nft.creator?.avatar || "/placeholder.svg"}
+                      alt={nft.creator?.name || "User"}
                       className="w-8 h-8 rounded-full mr-3"
                     />
                     <div>
                       <div className="font-medium">Listed</div>
-                      <div className="text-sm text-muted-foreground">for {nft.price} ETH</div>
+                      <div className="text-sm text-muted-foreground">for ${nft.price.toFixed(2)}</div>
                     </div>
                   </div>
                   <div className="text-right">

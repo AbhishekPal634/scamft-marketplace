@@ -66,7 +66,7 @@ serve(async (req) => {
       {
         query_embedding: embedding,
         match_threshold: 0.5,
-        match_count: limit
+        match_count: limit * 2 // Get extra results to filter listed ones
       }
     );
 
@@ -74,8 +74,18 @@ serve(async (req) => {
       throw new Error(`Failed to search NFTs: ${error.message}`);
     }
 
+    // Filter results to only show NFTs that are listed for sale
+    const { data: listedNftIds } = await supabase
+      .from('nfts')
+      .select('id')
+      .eq('listed', true)
+      .in('id', nfts.map(nft => nft.id));
+
+    const listedIdSet = new Set(listedNftIds?.map(item => item.id) || []);
+    const listedResults = nfts.filter(nft => listedIdSet.has(nft.id)).slice(0, limit);
+
     return new Response(
-      JSON.stringify({ results: nfts }),
+      JSON.stringify({ results: listedResults }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {

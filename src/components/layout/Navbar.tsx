@@ -192,13 +192,15 @@ const Navbar = () => {
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center">
+      <div className="container flex h-14 items-center">
         <div className="flex items-center justify-between w-full gap-4">
           {/* Logo and Mobile Menu */}
           <div className="flex items-center">
             {isMobile && mobileMenu}
             <Link to="/" className="font-bold text-xl ml-2">
-              ScamFT
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-500">
+                ScamFT
+              </span>
             </Link>
           </div>
 
@@ -254,7 +256,7 @@ const Navbar = () => {
                         <div>
                           <p className="text-sm font-medium">{result.title}</p>
                           <p className="text-xs text-muted-foreground">
-                            {result.price} ETH
+                            ${result.price.toFixed(2)}
                           </p>
                         </div>
                       </Link>

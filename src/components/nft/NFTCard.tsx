@@ -35,39 +35,7 @@ const NFTCard = ({ nft, minimal = false }: NFTCardProps) => {
       return;
     }
     
-    try {
-      // Update local state immediately for UI responsiveness
-      toggleLike(nft.id);
-      
-      // Get current likes count from the database
-      const { data: currentNft } = await supabase
-        .from('nfts')
-        .select('likes')
-        .eq('id', nft.id)
-        .single();
-        
-      // Determine new likes count based on whether the user is liking or unliking
-      const newLikesCount = nft.isLiked 
-        ? Math.max((currentNft?.likes || 0) - 1, 0) // Unliking - subtract 1, but don't go below 0
-        : (currentNft?.likes || 0) + 1; // Liking - add 1
-        
-      // Update the likes count in the database
-      await supabase
-        .from('nfts')
-        .update({ likes: newLikesCount })
-        .eq('id', nft.id);
-    } catch (error) {
-      console.error("Error updating likes:", error);
-      
-      // Revert the local state change if the API call failed
-      toggleLike(nft.id);
-      
-      toast({
-        title: "Error",
-        description: "Could not update like status",
-        variant: "destructive"
-      });
-    }
+    toggleLike(nft.id);
   };
   
   const handleShare = (e: React.MouseEvent) => {

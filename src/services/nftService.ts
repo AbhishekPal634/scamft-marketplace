@@ -1,4 +1,3 @@
-
 import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -26,8 +25,9 @@ export interface NFT {
   category: string;
   editions: NFTEditions;
   likes: number;
-  views: number;
   isLiked: boolean;
+  owner_id?: string; // Add owner_id for ownership tracking
+  listed: boolean; // Whether the NFT is currently listed for sale
   embedding?: number[]; // Add embedding property for vector search
 }
 
@@ -59,7 +59,28 @@ export interface PurchaseItem {
 }
 
 // Map database NFT to frontend NFT model
-const mapDbNftToNft = (dbNft: any): NFT => {
+const mapDbNftToNft = async (dbNft: any): Promise<NFT> => {
+  // Fetch creator info if we have a creator_id
+  let creatorName = "Artist";
+  let creatorAvatar = '/placeholder.svg';
+  
+  if (dbNft.creator_id) {
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', dbNft.creator_id)
+        .single();
+        
+      if (profile) {
+        creatorName = profile.full_name || profile.username || "Artist";
+        creatorAvatar = profile.avatar_url || '/placeholder.svg';
+      }
+    } catch (error) {
+      console.error('Error fetching creator profile:', error);
+    }
+  }
+  
   return {
     id: dbNft.id,
     title: dbNft.title || 'Untitled NFT',
@@ -69,8 +90,8 @@ const mapDbNftToNft = (dbNft: any): NFT => {
     image_url: dbNft.image_url || '/placeholder.svg', // Keep both for compatibility
     creator: {
       id: dbNft.creator_id || '0',
-      name: 'Unknown Artist', // You might want to fetch this from profiles table
-      avatar: '/placeholder.svg', // Default avatar
+      name: creatorName,
+      avatar: creatorAvatar,
     },
     createdAt: dbNft.created_at || new Date().toISOString(),
     tags: dbNft.tags || [],
@@ -80,8 +101,9 @@ const mapDbNftToNft = (dbNft: any): NFT => {
       available: dbNft.editions_available || 1,
     },
     likes: dbNft.likes || 0,
-    views: dbNft.views || 0,
-    isLiked: false, // You might want to fetch this from a user_likes table
+    isLiked: false,
+    owner_id: dbNft.owner_id || dbNft.creator_id, // Default owner is creator
+    listed: dbNft.listed !== false, // Default to true if not specified
     embedding: dbNft.embedding ? JSON.parse(dbNft.embedding) : undefined,
   };
 };
@@ -115,6 +137,9 @@ export interface NFTStore {
   getUserNfts: (userId: string) => Promise<NFT[]>;
   filterNFTs: (filters: NFTFilters) => NFT[]; // Add filterNFTs method
   getNFTById: (id: string) => NFT | undefined; // Add getNFTById method
+  listNFT: (nftId: string, price: number) => Promise<boolean>;
+  unlistNFT: (nftId: string) => Promise<boolean>;
+  fetchMarketplaceNFTs: () => Promise<NFT[]>;
 }
 
 export const useNFTStore = create<NFTStore>((set, get) => ({
@@ -139,7 +164,8 @@ export const useNFTStore = create<NFTStore>((set, get) => ({
         throw error;
       }
       
-      const mappedNfts = nftsData.map(mapDbNftToNft);
+      // Use Promise.all to handle all the async mapDbNftToNft calls
+      const mappedNfts = await Promise.all(nftsData.map(mapDbNftToNft));
       set({ nfts: mappedNfts, isLoading: false });
       return mappedNfts;
     } catch (error) {
@@ -149,26 +175,66 @@ export const useNFTStore = create<NFTStore>((set, get) => ({
     }
   },
   
-  toggleLike: (id: string) => {
-    const { nfts } = get();
-    const updatedNfts = nfts.map((nft) => {
-      if (nft.id === id) {
-        const isLiked = !nft.isLiked;
-        const likesChange = isLiked ? 1 : -1;
+  // Fetch only NFTs available in the marketplace (listed = true)
+  fetchMarketplaceNFTs: async () => {
+    try {
+      set({ isLoading: true });
+      
+      const { data: nftsData, error } = await supabase
+        .from('nfts')
+        .select('*')
+        .eq('listed', true)
+        .order('created_at', { ascending: false });
         
-        // In a real application, you would make an API call here
-        // to update the like status in the database
-        
-        return {
-          ...nft,
-          isLiked,
-          likes: nft.likes + likesChange,
-        };
+      if (error) {
+        console.error('Error fetching marketplace NFTs:', error);
+        throw error;
       }
-      return nft;
-    });
+      
+      const mappedNfts = await Promise.all(nftsData.map(mapDbNftToNft));
+      set({ nfts: mappedNfts, isLoading: false });
+      return mappedNfts;
+    } catch (error) {
+      console.error('Error fetching marketplace NFTs:', error);
+      set({ isLoading: false });
+      return [];
+    }
+  },
+  
+  toggleLike: async (id: string) => {
+    const { nfts } = get();
+    const nft = nfts.find(n => n.id === id);
+    if (!nft) return;
+
+    // Optimistically update UI
+    const isLiked = !nft.isLiked;
+    const likesChange = isLiked ? 1 : -1;
+    
+    const updatedNfts = nfts.map((item) => 
+      item.id === id 
+        ? { ...item, isLiked, likes: item.likes + likesChange } 
+        : item
+    );
     
     set({ nfts: updatedNfts });
+    
+    // Update the database
+    try {
+      const { data, error } = await supabase
+        .from('nfts')
+        .update({ likes: nft.likes + likesChange })
+        .eq('id', id);
+        
+      if (error) {
+        console.error('Error updating likes:', error);
+        // Revert on error
+        set({ nfts });
+      }
+    } catch (error) {
+      console.error('Error updating likes:', error);
+      // Revert on error
+      set({ nfts });
+    }
   },
   
   getUserPurchases: async (userId: string) => {
@@ -209,45 +275,25 @@ export const useNFTStore = create<NFTStore>((set, get) => ({
   
   getUserNfts: async (userId: string) => {
     try {
-      // First get all purchase items for the user
-      const { data: purchases, error: purchasesError } = await supabase
-        .from('purchases')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('status', 'completed');
+      set({ isLoading: true });
+      
+      // Get NFTs owned by this user
+      const { data: ownedNfts, error: ownedError } = await supabase
+        .from('nfts')
+        .select('*')
+        .eq('owner_id', userId);
         
-      if (purchasesError) {
-        console.error('Error fetching user purchases:', purchasesError);
-        throw purchasesError;
+      if (ownedError) {
+        console.error('Error fetching owned NFTs:', ownedError);
+        throw ownedError;
       }
       
-      if (purchases.length === 0) {
-        return [];
-      }
-      
-      const purchaseIds = purchases.map(p => p.id);
-      
-      const { data: purchaseItems, error: itemsError } = await supabase
-        .from('purchase_items')
-        .select('*, nft:nfts(*)')
-        .in('purchase_id', purchaseIds);
-        
-      if (itemsError) {
-        console.error('Error fetching purchase items:', itemsError);
-        throw itemsError;
-      }
-      
-      // Map and deduplicate NFTs
-      const nftMap = new Map<string, any>();
-      purchaseItems.forEach(item => {
-        if (item.nft && !nftMap.has(item.nft.id)) {
-          nftMap.set(item.nft.id, item.nft);
-        }
-      });
-      
-      return Array.from(nftMap.values()).map(mapDbNftToNft);
+      const mappedNfts = await Promise.all(ownedNfts.map(mapDbNftToNft));
+      set({ isLoading: false });
+      return mappedNfts;
     } catch (error) {
       console.error('Error fetching user NFTs:', error);
+      set({ isLoading: false });
       return [];
     }
   },
@@ -306,5 +352,47 @@ export const useNFTStore = create<NFTStore>((set, get) => ({
   getNFTById: (id: string) => {
     const { nfts } = get();
     return nfts.find(nft => nft.id === id);
+  },
+  
+  // Add listing management functions
+  listNFT: async (nftId: string, price: number) => {
+    try {
+      const { data, error } = await supabase
+        .from('nfts')
+        .update({ 
+          price: price,
+          listed: true
+        })
+        .eq('id', nftId);
+        
+      if (error) {
+        console.error('Error listing NFT:', error);
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error listing NFT:', error);
+      return false;
+    }
+  },
+  
+  unlistNFT: async (nftId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('nfts')
+        .update({ listed: false })
+        .eq('id', nftId);
+        
+      if (error) {
+        console.error('Error unlisting NFT:', error);
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error unlisting NFT:', error);
+      return false;
+    }
   }
 }));
