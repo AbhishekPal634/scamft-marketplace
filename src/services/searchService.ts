@@ -14,23 +14,15 @@ export const searchNFTsByText = async (query: string): Promise<NFT[]> => {
   try {
     console.log("Searching for NFTs with query:", query);
     
-    // Create a timeout promise
-    const timeoutPromise = new Promise<{ error: string }>((_, reject) => {
-      setTimeout(() => reject(new Error('Search timeout')), 10000);
-    });
-    
-    const searchPromise = supabase.functions.invoke<SearchResponse>('search-nfts', {
+    const { data, error: funcError } = await supabase.functions.invoke<SearchResponse>('search-nfts', {
       body: { query, limit: 20 },
       headers: {
         "Content-Type": "application/json"
       }
     });
     
-    // Race between the search and the timeout
-    const response = await Promise.race([searchPromise, timeoutPromise]);
-    
-    if ('error' in response) {
-      console.error("Search error:", response.error);
+    if (funcError) {
+      console.error("Search error:", funcError);
       toast({
         title: "Search Failed",
         description: "Using local search as fallback",
@@ -41,8 +33,6 @@ export const searchNFTsByText = async (query: string): Promise<NFT[]> => {
       return fallbackLocalSearch(query);
     }
 
-    const data = response.data;
-    
     if (!data || !data.results) {
       console.warn("Search returned no data or results property");
       return fallbackLocalSearch(query);
@@ -124,12 +114,7 @@ export const findSimilarNFTs = async (nftId: string, limit = 4): Promise<NFT[]> 
     if (nft.embedding) {
       console.log("Finding similar NFTs using embedding");
       
-      // Create a timeout promise
-      const timeoutPromise = new Promise<{ error: string }>((_, reject) => {
-        setTimeout(() => reject(new Error('Search timeout')), 10000);
-      });
-      
-      const searchPromise = supabase.functions.invoke<SearchResponse>('search-nfts', {
+      const { data, error: funcError } = await supabase.functions.invoke<SearchResponse>('search-nfts', {
         body: { 
           embedding: nft.embedding,
           limit: limit + 1 // Request one more so we can filter out the current NFT
@@ -139,18 +124,17 @@ export const findSimilarNFTs = async (nftId: string, limit = 4): Promise<NFT[]> 
         }
       });
       
-      // Race between the search and the timeout
-      const response = await Promise.race([searchPromise, timeoutPromise]);
-      
-      if ('error' in response) {
-        console.error("Search error:", response.error);
-        throw new Error(response.error);
+      if (funcError) {
+        console.error("Search error:", funcError);
+        throw new Error(funcError.message);
       }
       
-      const data = response.data;
+      if (!data || !data.results) {
+        throw new Error("No results returned from search function");
+      }
       
       // Filter out the current NFT and any unlisted NFTs
-      const similarNfts = data?.results
+      const similarNfts = data.results
         .filter((item: any) => item.id !== nftId && item.listed !== false)
         .slice(0, limit) || [];
         

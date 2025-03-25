@@ -21,17 +21,20 @@ serve(async (req) => {
   }
 
   try {
-    // Get the request data
-    const requestData = await req.text();
+    // Get the request body as text first
+    const requestText = await req.text();
     let requestBody;
     
     try {
-      // Safely parse the request body
-      requestBody = requestData ? JSON.parse(requestData) : {};
+      // Only try to parse as JSON if there's content
+      requestBody = requestText ? JSON.parse(requestText) : {};
     } catch (parseError) {
-      console.error("Failed to parse request body:", parseError, "Request text:", requestData);
+      console.error("Failed to parse request body:", parseError, "Raw request:", requestText);
       return new Response(
-        JSON.stringify({ error: "Invalid JSON in request body" }),
+        JSON.stringify({ 
+          error: "Invalid JSON in request body",
+          results: [] 
+        }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

@@ -27,28 +27,18 @@ export const useSearch = () => {
     try {
       console.log("Searching for:", query);
       
-      // Create a timeout promise
-      const timeoutPromise = new Promise<{ error: string }>((_, reject) => {
-        setTimeout(() => reject(new Error('Search timeout')), 10000);
-      });
-      
-      const searchPromise = supabase.functions.invoke<SearchResponse>('search-nfts', {
+      const { data, error: funcError } = await supabase.functions.invoke<SearchResponse>('search-nfts', {
         body: { query },
         headers: {
           "Content-Type": "application/json"
         }
       });
       
-      // Race between the search and the timeout
-      const response = await Promise.race([searchPromise, timeoutPromise]);
-      
-      // Check if response has an error property from our edge function
-      if ('error' in response) {
-        console.error("Search function error:", response.error);
-        throw new Error(response.error);
+      // Check if there was an error with the function call
+      if (funcError) {
+        console.error("Search function error:", funcError);
+        throw new Error(funcError.message);
       }
-
-      const data = response.data;
       
       if (!data) {
         console.warn("Search returned no data");

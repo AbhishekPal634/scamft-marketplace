@@ -56,31 +56,22 @@ const SearchBar = ({ fullWidth = false, autoFocus = false, className = "" }: Sea
     };
   }, []);
   
-  // Debounced search function
-  useEffect(() => {
-    if (!query.trim()) {
-      setShowResults(false);
-      return;
-    }
-    
-    const timer = setTimeout(() => {
-      if (query.trim().length >= 2) {
-        search(query);
-        setShowResults(true);
-      }
-    }, 300);
-    
-    return () => clearTimeout(timer);
-  }, [query, search]);
+  // No more automatic search on query change - search is only triggered by submit
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (query.trim()) {
-      search(query);
       if (query.trim().length >= 2) {
-        navigate(`/explore?search=${encodeURIComponent(query.trim())}`);
-        setShowResults(false);
+        search(query);
+        setShowResults(true);
       }
+    }
+  };
+  
+  const handleNavigateToExplore = () => {
+    if (query.trim()) {
+      navigate(`/explore?search=${encodeURIComponent(query.trim())}`);
+      setShowResults(false);
     }
   };
   
@@ -101,7 +92,7 @@ const SearchBar = ({ fullWidth = false, autoFocus = false, className = "" }: Sea
           onChange={(e) => {
             setQuery(e.target.value);
           }}
-          onFocus={() => query.trim().length >= 2 && setShowResults(true)}
+          onFocus={() => query.trim().length >= 2 && results.length > 0 && setShowResults(true)}
         />
         <div className="absolute right-16 top-1/2 transform -translate-y-1/2 flex items-center">
           {query && (
@@ -189,7 +180,7 @@ const SearchBar = ({ fullWidth = false, autoFocus = false, className = "" }: Sea
                     variant="link" 
                     size="sm" 
                     className="text-xs"
-                    onClick={() => navigate(`/explore?search=${encodeURIComponent(query.trim())}`)}
+                    onClick={handleNavigateToExplore}
                   >
                     View all {results.length} results
                   </Button>
