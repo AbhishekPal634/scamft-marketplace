@@ -9,7 +9,7 @@ interface SearchResponse {
   [key: string]: any;
 }
 
-// This function uses the Supabase edge function for proper vector search
+// This function uses the Supabase edge function for proper search
 export const searchNFTsByText = async (query: string): Promise<NFT[]> => {
   try {
     console.log("Searching for NFTs with query:", query);
@@ -110,68 +110,9 @@ export const findSimilarNFTs = async (nftId: string, limit = 4): Promise<NFT[]> 
   }
   
   try {
-    // If NFT has embedding, try to use vector search
-    if (nft.embedding) {
-      console.log("Finding similar NFTs using embedding");
-      
-      const { data, error: funcError } = await supabase.functions.invoke<SearchResponse>('search-nfts', {
-        body: { 
-          embedding: nft.embedding,
-          limit: limit + 1 // Request one more so we can filter out the current NFT
-        },
-        headers: {
-          "Content-Type": "application/json"
-        }
-      });
-      
-      if (funcError) {
-        console.error("Search error:", funcError);
-        throw new Error(funcError.message);
-      }
-      
-      if (!data || !data.results) {
-        throw new Error("No results returned from search function");
-      }
-      
-      // Filter out the current NFT and any unlisted NFTs
-      const similarNfts = data.results
-        .filter((item: any) => item.id !== nftId && item.listed !== false)
-        .slice(0, limit) || [];
-        
-      if (similarNfts.length > 0) {
-        // Map the raw database results to NFT objects
-        const mappedResults: NFT[] = similarNfts.map((item: any) => ({
-          id: item.id,
-          title: item.title || "Untitled NFT",
-          description: item.description || "",
-          price: typeof item.price === 'number' ? item.price : parseFloat(String(item.price)) || 0,
-          image: item.image_url || "/placeholder.svg",
-          image_url: item.image_url || "/placeholder.svg",
-          creator: {
-            id: item.creator_id || "0",
-            name: item.creator_name || "Unknown Artist",
-            avatar: item.creator_avatar || "/placeholder.svg",
-          },
-          createdAt: item.created_at || new Date().toISOString(),
-          tags: item.tags || [],
-          category: item.category || "Art",
-          editions: {
-            total: item.editions_total || 1,
-            available: item.editions_available || 1,
-          },
-          likes: item.likes || 0,
-          views: item.views || 0,
-          isLiked: false,
-          listed: item.listed !== false,
-          owner_id: item.owner_id || item.creator_id,
-        }));
-
-        return mappedResults;
-      }
-    }
+    console.log("Finding similar NFTs using tag-based similarity");
     
-    console.log("Falling back to tag-based similarity");
-    // Fallback to tag-based similarity
+    // Use tag-based similarity
     const allNFTs = store.nfts.length > 0 
       ? store.nfts.filter(item => item.id !== nftId && item.listed !== false)
       : (await store.fetchMarketplaceNFTs()).filter(item => item.id !== nftId);
