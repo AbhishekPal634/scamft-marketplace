@@ -23,6 +23,7 @@ export interface SearchResponse {
     views: number;
     listed: boolean;
     created_at: string;
+    owner_id?: string; // Add owner_id as optional property
   }>;
   count: number;
   error?: string;
@@ -101,7 +102,7 @@ export const useSearch = () => {
         views: item.views || 0,
         isLiked: false,
         listed: item.listed !== false,
-        owner_id: item.owner_id || item.creator_id,
+        owner_id: item.owner_id || item.creator_id, // Use owner_id if present, fall back to creator_id
       }));
 
       setResults(mappedResults);

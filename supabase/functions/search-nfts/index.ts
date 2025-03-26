@@ -43,6 +43,7 @@ serve(async (req) => {
         category,
         tags,
         creator_id,
+        owner_id,
         editions_total,
         editions_available,
         likes,
@@ -74,6 +75,7 @@ serve(async (req) => {
       category: nft.category,
       tags: nft.tags,
       creator_id: nft.creator_id,
+      owner_id: nft.owner_id, // Include owner_id in the response
       creator_name: nft.profiles?.full_name || nft.profiles?.username || "Unknown Artist",
       creator_avatar: nft.profiles?.avatar_url || "/placeholder.svg",
       editions_total: nft.editions_total,
