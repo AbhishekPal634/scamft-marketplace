@@ -21,28 +21,32 @@ serve(async (req) => {
   }
 
   try {
-    // Get the request body as text first
-    const requestText = await req.text();
-    let requestBody;
+    // Parse request body
+    let requestBody = {};
     
-    try {
-      // Only try to parse as JSON if there's content
-      requestBody = requestText ? JSON.parse(requestText) : {};
-    } catch (parseError) {
-      console.error("Failed to parse request body:", parseError, "Raw request:", requestText);
-      return new Response(
-        JSON.stringify({ 
-          error: "Invalid JSON in request body",
-          results: [] 
-        }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (req.method === "POST") {
+      try {
+        const body = await req.text();
+        if (body) {
+          requestBody = JSON.parse(body);
+        }
+      } catch (parseError) {
+        console.error("Failed to parse request body:", parseError);
+        return new Response(
+          JSON.stringify({ 
+            error: "Invalid JSON in request body",
+            results: [] 
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
     
     const { query, embedding, limit = 10 } = requestBody;
 
     console.log(`Search request received: ${query ? `query: ${query}` : "embedding search"}, limit: ${limit}`);
 
+    // If no query or embedding is provided, return an error
     if (!query && !embedding) {
       console.error("Missing query or embedding parameter");
       return new Response(
@@ -56,12 +60,13 @@ serve(async (req) => {
 
     // Text search fallback function
     const performTextSearch = async () => {
-      console.log("Performing text search");
+      console.log("Performing text search for:", query);
       try {
         const { data: textSearchResults, error: textSearchError } = await supabase
           .from('nfts')
           .select('*')
           .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
+          .eq('listed', true) // Only search listed NFTs
           .limit(limit);
         
         if (textSearchError) {
@@ -77,9 +82,9 @@ serve(async (req) => {
       }
     };
 
-    // Fallback to text search if Gemini API key is not configured or if we encounter errors
-    if (!geminiApiKey && query) {
-      console.log("Gemini API key not configured, falling back to text search");
+    // If no Gemini API key or if we have a text query, use text search
+    if ((!geminiApiKey && query) || !embedding) {
+      console.log("Using text search");
       const results = await performTextSearch();
       return new Response(
         JSON.stringify({ results }),
@@ -89,8 +94,8 @@ serve(async (req) => {
 
     let queryEmbedding = embedding;
 
-    // If we have a text query and no embedding, try to generate an embedding
-    if (query && !embedding) {
+    // If we have a text query and no embedding, try to generate an embedding with Gemini
+    if (query && !embedding && geminiApiKey) {
       try {
         console.log("Generating embedding for query:", query);
         const embeddingResponse = await fetch(`https://generativelanguage.googleapis.com/v1/models/embedding-001:embedContent?key=${geminiApiKey}`, {
@@ -141,47 +146,40 @@ serve(async (req) => {
       }
     }
 
-    // If we have an embedding, try vector search
+    // If we have an embedding, try vector search with match_nfts function
     if (queryEmbedding) {
       try {
-        // Check if match_nfts function exists
-        try {
-          // Call the match_nfts function with the embedding
-          console.log("Calling match_nfts function");
-          const { data: nfts, error } = await supabase.rpc(
-            'match_nfts',
-            {
-              query_embedding: queryEmbedding,
-              match_threshold: 0.5,
-              match_count: limit
-            }
-          );
-
-          if (error) {
-            console.error("Error calling match_nfts:", error);
-            throw error;
+        console.log("Calling match_nfts function with embedding");
+        const { data: nfts, error } = await supabase.rpc(
+          'match_nfts',
+          {
+            query_embedding: queryEmbedding,
+            match_threshold: 0.5,
+            match_count: limit
           }
+        );
 
-          console.log(`Vector search found ${nfts?.length || 0} results`);
-          
-          // If no results from vector search and we have a query, try text search
-          if ((!nfts || nfts.length === 0) && query) {
-            console.log("No vector search results, falling back to text search");
-            const results = await performTextSearch();
-            return new Response(
-              JSON.stringify({ results }),
-              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
-          }
-          
+        if (error) {
+          console.error("Error calling match_nfts:", error);
+          throw error;
+        }
+
+        console.log(`Vector search found ${nfts?.length || 0} results`);
+        
+        // If no results from vector search and we have a query, try text search
+        if ((!nfts || nfts.length === 0) && query) {
+          console.log("No vector search results, falling back to text search");
+          const results = await performTextSearch();
           return new Response(
-            JSON.stringify({ results: nfts || [] }),
+            JSON.stringify({ results }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
-        } catch (rpcError) {
-          console.error("RPC error, match_nfts might not exist:", rpcError);
-          throw rpcError;
         }
+        
+        return new Response(
+          JSON.stringify({ results: nfts || [] }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       } catch (error) {
         console.error("Vector search error:", error);
         // Fall back to text search if vector search fails and we have a query
@@ -199,16 +197,10 @@ serve(async (req) => {
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-    } else if (query) {
-      // If we don't have an embedding but have a query, perform text search
-      const results = await performTextSearch();
-      return new Response(
-        JSON.stringify({ results }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
     }
 
     // This should never happen but just in case
+    console.error("No search method was executed");
     return new Response(
       JSON.stringify({ error: "Invalid search parameters", results: [] }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }

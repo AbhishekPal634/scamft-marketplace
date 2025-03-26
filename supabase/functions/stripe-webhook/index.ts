@@ -87,12 +87,24 @@ serve(async (req) => {
                 continue;
               }
               
+              // Get original NFT data before updating
+              const { data: nftData, error: nftFetchError } = await supabase
+                .from("nfts")
+                .select("*")
+                .eq("id", item.id)
+                .single();
+                
+              if (nftFetchError) {
+                console.error(`Error fetching NFT ${item.id}:`, nftFetchError);
+                continue;
+              }
+              
               // Update the NFT to transfer ownership and remove from marketplace
               const { error: nftUpdateError } = await supabase
                 .from("nfts")
                 .update({ 
                   owner_id: userId,
-                  is_listed: false, 
+                  listed: false, 
                   editions_available: 0 
                 })
                 .eq("id", item.id);
@@ -101,6 +113,26 @@ serve(async (req) => {
                 console.error(`Error updating NFT ${item.id}:`, nftUpdateError);
               } else {
                 console.log(`Successfully transferred ownership of NFT ${item.id} to user ${userId}`);
+                
+                // Store the purchase history including original creator info
+                if (nftData) {
+                  const { error: historyError } = await supabase
+                    .from("nft_history")
+                    .insert({
+                      nft_id: item.id,
+                      previous_owner_id: nftData.owner_id || nftData.creator_id,
+                      new_owner_id: userId,
+                      purchase_id: purchaseId,
+                      price: item.price,
+                      transaction_date: new Date().toISOString()
+                    });
+                    
+                  if (historyError) {
+                    console.error(`Error recording NFT history for ${item.id}:`, historyError);
+                  } else {
+                    console.log(`Recorded purchase history for NFT ${item.id}`);
+                  }
+                }
               }
             }
           } catch (parseError) {
