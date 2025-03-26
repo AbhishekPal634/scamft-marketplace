@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -23,45 +22,91 @@ serve(async (req) => {
 
   try {
     // Parse the request body
-    const { query } = await req.json();
+    const requestData = await req.json();
+    const { query, embedding, limit = 20 } = requestData;
     
-    if (!query || typeof query !== "string") {
-      throw new Error("Search query is required and must be a string");
+    console.log(`Processing search request: ${JSON.stringify(requestData)}`);
+    
+    let textResults;
+    let textError;
+    
+    // If we have an embedding vector, do a vector search
+    if (embedding) {
+      console.log(`Performing vector search with embedding of length ${embedding.length}`);
+      
+      // Vector search using cosine distance
+      const { data, error } = await supabase
+        .from("nfts")
+        .select(`
+          id, 
+          title, 
+          description, 
+          price, 
+          image_url, 
+          category,
+          tags,
+          creator_id,
+          owner_id,
+          editions_total,
+          editions_available,
+          likes,
+          views,
+          listed,
+          created_at,
+          profiles:creator_id (
+            username,
+            full_name,
+            avatar_url
+          )
+        `)
+        .eq('listed', true)
+        .order('embedding <=> ${embedding}', { ascending: true })
+        .limit(limit);
+      
+      textResults = data;
+      textError = error;
+    } 
+    // Otherwise, if we have a query string, do a text search
+    else if (query && typeof query === "string") {
+      console.log(`Performing text search for: "${query}"`);
+      
+      // Perform a text search across multiple columns
+      const { data, error } = await supabase
+        .from("nfts")
+        .select(`
+          id, 
+          title, 
+          description, 
+          price, 
+          image_url, 
+          category,
+          tags,
+          creator_id,
+          owner_id,
+          editions_total,
+          editions_available,
+          likes,
+          views,
+          listed,
+          created_at,
+          profiles:creator_id (
+            username,
+            full_name,
+            avatar_url
+          )
+        `)
+        .or(`title.ilike.%${query}%,description.ilike.%${query}%,category.ilike.%${query}%`)
+        .eq('listed', true)
+        .order('created_at', { ascending: false });
+      
+      textResults = data;
+      textError = error;
+    } else {
+      throw new Error("Search requires either a text query or an embedding vector");
     }
-
-    console.log(`Received search query: "${query}"`);
-    
-    // Perform a text search across multiple columns
-    const { data: textResults, error: textError } = await supabase
-      .from("nfts")
-      .select(`
-        id, 
-        title, 
-        description, 
-        price, 
-        image_url, 
-        category,
-        tags,
-        creator_id,
-        owner_id,
-        editions_total,
-        editions_available,
-        likes,
-        views,
-        listed,
-        created_at,
-        profiles:creator_id (
-          username,
-          full_name,
-          avatar_url
-        )
-      `)
-      .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
-      .eq('listed', true)
-      .order('created_at', { ascending: false });
     
     if (textError) {
-      console.error("Error during text search:", textError);
+      console.error("Error during search:", textError);
       throw textError;
     }
 
@@ -75,7 +120,7 @@ serve(async (req) => {
       category: nft.category,
       tags: nft.tags,
       creator_id: nft.creator_id,
-      owner_id: nft.owner_id, // Include owner_id in the response
+      owner_id: nft.owner_id,
       creator_name: nft.profiles?.full_name || nft.profiles?.username || "Unknown Artist",
       creator_avatar: nft.profiles?.avatar_url || "/placeholder.svg",
       editions_total: nft.editions_total,
