@@ -9,6 +9,54 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      nft_history: {
+        Row: {
+          created_at: string | null
+          id: string
+          new_owner_id: string
+          nft_id: string
+          previous_owner_id: string
+          price: number
+          purchase_id: string | null
+          transaction_date: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          new_owner_id: string
+          nft_id: string
+          previous_owner_id: string
+          price: number
+          purchase_id?: string | null
+          transaction_date?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          new_owner_id?: string
+          nft_id?: string
+          previous_owner_id?: string
+          price?: number
+          purchase_id?: string | null
+          transaction_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nft_history_nft_id_fkey"
+            columns: ["nft_id"]
+            isOneToOne: false
+            referencedRelation: "nfts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nft_history_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "purchases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nfts: {
         Row: {
           category: string | null
@@ -21,6 +69,7 @@ export type Database = {
           id: string
           image_url: string
           likes: number | null
+          listed: boolean | null
           price: number
           tags: string[] | null
           title: string
@@ -38,6 +87,7 @@ export type Database = {
           id?: string
           image_url: string
           likes?: number | null
+          listed?: boolean | null
           price: number
           tags?: string[] | null
           title: string
@@ -55,6 +105,7 @@ export type Database = {
           id?: string
           image_url?: string
           likes?: number | null
+          listed?: boolean | null
           price?: number
           tags?: string[] | null
           title?: string

@@ -30,13 +30,15 @@ import {
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import NFTCard from "@/components/nft/NFTCard";
+import SearchBar from "@/components/search/SearchBar";
 import { useNFTStore, NFTFilters, NFT } from "@/services/nftService";
-import { searchNFTsByText } from "@/services/searchService";
+import { useSearch } from "@/hooks/useSearch";
 
 const Explore = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { nfts, fetchMarketplaceNFTs, filterNFTs } = useNFTStore();
+  const { search, results: searchResults, isLoading: searchLoading } = useSearch();
   
   const [filteredNFTs, setFilteredNFTs] = useState<NFT[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,8 +60,10 @@ const Explore = () => {
     
     if (searchParam) {
       setSearchQuery(searchParam);
+      // Perform search when search parameter is present
+      search(searchParam);
     }
-  }, [location.search]);
+  }, [location.search, search]);
   
   // Fetch NFTs and apply initial filters
   useEffect(() => {
@@ -67,44 +71,26 @@ const Explore = () => {
       setLoading(true);
       
       // Always fetch marketplace NFTs (only those listed for sale)
-      let data = nfts.length > 0 ? nfts : await fetchMarketplaceNFTs();
+      await fetchMarketplaceNFTs();
       
-      if (searchQuery) {
-        // Use search results if we have a search query
-        data = await searchNFTsByText(searchQuery);
-      } else {
-        // Apply filters from URL if no search query
-        const filters: NFTFilters = {
-          sortBy: sortOption as any,
-          minPrice: priceRange[0],
-          maxPrice: priceRange[1],
-          tags: activeTags.length > 0 ? activeTags : undefined,
-        };
-        
-        if (activeCategory !== "all") {
-          filters.category = activeCategory;
-        }
-        
-        data = filterNFTs(filters);
-      }
-      
-      setFilteredNFTs(data);
       setLoading(false);
     };
     
     initializeData();
-  }, [
-    nfts, 
-    fetchMarketplaceNFTs, 
-    activeCategory, 
-    searchQuery,
-    location.search
-  ]);
+  }, [fetchMarketplaceNFTs]);
   
   // Apply filters whenever filter settings change
   useEffect(() => {
-    if (loading || searchQuery) return;
+    // If we're still loading, don't apply filters yet
+    if (loading) return;
     
+    // If we have search results, use those instead of applying filters
+    if (searchQuery && searchResults.length > 0) {
+      setFilteredNFTs(searchResults);
+      return;
+    }
+    
+    // Apply filters to the NFTs
     const filters: NFTFilters = {
       sortBy: sortOption as any,
       minPrice: priceRange[0],
@@ -138,8 +124,24 @@ const Explore = () => {
     filterNFTs, 
     navigate,
     loading,
-    searchQuery
+    searchQuery,
+    searchResults,
+    nfts
   ]);
+  
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    search(query);
+    
+    // Update URL with search query
+    const params = new URLSearchParams(location.search);
+    if (query) {
+      params.set("search", query);
+    } else {
+      params.delete("search");
+    }
+    navigate({ search: params.toString() }, { replace: true });
+  };
   
   const handleCategoryChange = (category: string) => {
     setActiveCategory(category);
@@ -202,6 +204,9 @@ const Explore = () => {
     hidden: { opacity: 0, y: 20 },
     show: { opacity: 1, y: 0, transition: { duration: 0.4 } }
   };
+
+  // Determine if we're in a loading state
+  const isLoadingData = loading || searchLoading;
   
   return (
     <div className="flex flex-col min-h-screen">
@@ -215,6 +220,17 @@ const Explore = () => {
             <p className="text-muted-foreground">
               Discover unique digital art from creators around the world
             </p>
+          </div>
+          
+          {/* Search Bar */}
+          <div className="mb-6 max-w-xl">
+            <SearchBar 
+              initialQuery={searchQuery}
+              onSearch={handleSearch}
+              size="lg"
+              variant="filled"
+              className="w-full"
+            />
           </div>
           
           {/* Filter Controls */}
@@ -472,14 +488,14 @@ const Explore = () => {
               {/* Results Count */}
               <div className="mb-6">
                 <p className="text-sm text-muted-foreground">
-                  {loading
+                  {isLoadingData
                     ? "Loading..."
                     : `Showing ${filteredNFTs.length} results`}
                 </p>
               </div>
               
               {/* Loading State */}
-              {loading ? (
+              {isLoadingData ? (
                 <div className="min-h-[300px] flex items-center justify-center">
                   <div className="text-center">
                     <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>

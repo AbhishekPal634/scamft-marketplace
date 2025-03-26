@@ -1,13 +1,31 @@
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { NFT } from "@/services/nftService";
 import { toast } from "@/components/ui/use-toast";
 
 // Define a type for the search response
-interface SearchResponse {
-  results: any[];
-  [key: string]: any;
+export interface SearchResponse {
+  results: Array<{
+    id: string;
+    title: string;
+    description: string;
+    price: number;
+    image_url: string;
+    category: string;
+    tags: string[];
+    creator_id: string;
+    creator_name: string;
+    creator_avatar: string;
+    editions_total: number;
+    editions_available: number;
+    likes: number;
+    views: number;
+    listed: boolean;
+    created_at: string;
+  }>;
+  count: number;
+  error?: string;
 }
 
 export const useSearch = () => {
@@ -15,7 +33,7 @@ export const useSearch = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const search = async (query: string) => {
+  const search = useCallback(async (query: string) => {
     if (!query.trim()) {
       setResults([]);
       return;
@@ -46,8 +64,13 @@ export const useSearch = () => {
         return;
       }
 
-      if (!data.results) {
-        console.warn("Search returned no results property");
+      if (data.error) {
+        console.error("Search returned an error:", data.error);
+        throw new Error(data.error);
+      }
+
+      if (!data.results || !Array.isArray(data.results)) {
+        console.warn("Search returned no results array");
         setResults([]);
         return;
       }
@@ -55,7 +78,7 @@ export const useSearch = () => {
       console.log(`Search returned ${data.results.length} results`);
 
       // Map the raw database results to NFT objects
-      const mappedResults: NFT[] = data.results.map((item: any) => ({
+      const mappedResults: NFT[] = data.results.map((item) => ({
         id: item.id,
         title: item.title || "Untitled NFT",
         description: item.description || "",
@@ -101,7 +124,7 @@ export const useSearch = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   return { search, results, isLoading, error };
 };

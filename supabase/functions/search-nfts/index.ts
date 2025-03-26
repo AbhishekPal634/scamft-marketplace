@@ -2,17 +2,18 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// Environment variables
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const geminiApiKey = Deno.env.get("GEMINI_API_KEY") || "";
 
+// Initialize the Supabase client with service role key
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+// CORS headers for browser requests
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-// Initialize the Supabase client
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -21,195 +22,100 @@ serve(async (req) => {
   }
 
   try {
-    // Parse request body
-    let requestBody = {};
+    // Parse the request body
+    const { query } = await req.json();
     
-    if (req.method === "POST") {
-      try {
-        const body = await req.text();
-        if (body) {
-          requestBody = JSON.parse(body);
-        }
-      } catch (parseError) {
-        console.error("Failed to parse request body:", parseError);
-        return new Response(
-          JSON.stringify({ 
-            error: "Invalid JSON in request body",
-            results: [] 
-          }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+    if (!query || typeof query !== "string") {
+      throw new Error("Search query is required and must be a string");
     }
+
+    console.log(`Received search query: "${query}"`);
     
-    const { query, embedding, limit = 10 } = requestBody;
-
-    console.log(`Search request received: ${query ? `query: ${query}` : "embedding search"}, limit: ${limit}`);
-
-    // If no query or embedding is provided, return an error
-    if (!query && !embedding) {
-      console.error("Missing query or embedding parameter");
-      return new Response(
-        JSON.stringify({ 
-          error: "Missing query or embedding parameter",
-          results: [] 
-        }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // Perform a text search across multiple columns
+    const { data: textResults, error: textError } = await supabase
+      .from("nfts")
+      .select(`
+        id, 
+        title, 
+        description, 
+        price, 
+        image_url, 
+        category,
+        tags,
+        creator_id,
+        editions_total,
+        editions_available,
+        likes,
+        views,
+        listed,
+        created_at,
+        profiles:creator_id (
+          username,
+          full_name,
+          avatar_url
+        )
+      `)
+      .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
+      .eq('listed', true)
+      .order('created_at', { ascending: false });
+    
+    if (textError) {
+      console.error("Error during text search:", textError);
+      throw textError;
     }
 
-    // Text search fallback function
-    const performTextSearch = async () => {
-      console.log("Performing text search for:", query);
-      try {
-        const { data: textSearchResults, error: textSearchError } = await supabase
-          .from('nfts')
-          .select('*')
-          .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
-          .eq('listed', true) // Only search listed NFTs
-          .limit(limit);
-        
-        if (textSearchError) {
-          console.error("Text search error:", textSearchError);
-          throw new Error(`Text search failed: ${textSearchError.message}`);
-        }
-        
-        console.log(`Text search found ${textSearchResults?.length || 0} results`);
-        return textSearchResults || [];
-      } catch (error) {
-        console.error("Error in text search:", error);
-        return [];
-      }
-    };
+    // Process the results to have a more consistent format
+    const processedResults = textResults.map(nft => ({
+      id: nft.id,
+      title: nft.title,
+      description: nft.description,
+      price: nft.price,
+      image_url: nft.image_url,
+      category: nft.category,
+      tags: nft.tags,
+      creator_id: nft.creator_id,
+      creator_name: nft.profiles?.full_name || nft.profiles?.username || "Unknown Artist",
+      creator_avatar: nft.profiles?.avatar_url || "/placeholder.svg",
+      editions_total: nft.editions_total,
+      editions_available: nft.editions_available,
+      likes: nft.likes,
+      views: nft.views,
+      listed: nft.listed,
+      created_at: nft.created_at
+    }));
 
-    // If no Gemini API key or if we have a text query, use text search
-    if ((!geminiApiKey && query) || !embedding) {
-      console.log("Using text search");
-      const results = await performTextSearch();
-      return new Response(
-        JSON.stringify({ results }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    let queryEmbedding = embedding;
-
-    // If we have a text query and no embedding, try to generate an embedding with Gemini
-    if (query && !embedding && geminiApiKey) {
-      try {
-        console.log("Generating embedding for query:", query);
-        const embeddingResponse = await fetch(`https://generativelanguage.googleapis.com/v1/models/embedding-001:embedContent?key=${geminiApiKey}`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            model: "embedding-001",
-            content: {
-              parts: [{ text: query.substring(0, 8191) }] // Text limit
-            }
-          })
-        });
-
-        if (!embeddingResponse.ok) {
-          const errorText = await embeddingResponse.text();
-          console.error("Gemini API error:", errorText);
-          // Fall back to text search if embedding generation fails
-          const results = await performTextSearch();
-          return new Response(
-            JSON.stringify({ results }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
-        const data = await embeddingResponse.json();
-        if (!data.embedding || !data.embedding.values) {
-          console.error("Invalid embedding response:", data);
-          // Fall back to text search if embedding is invalid
-          const results = await performTextSearch();
-          return new Response(
-            JSON.stringify({ results }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        
-        queryEmbedding = data.embedding.values;
-        console.log("Embedding generated successfully");
-      } catch (error) {
-        console.error("Error generating embedding:", error);
-        // Fall back to text search if embedding generation fails
-        const results = await performTextSearch();
-        return new Response(
-          JSON.stringify({ results }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    }
-
-    // If we have an embedding, try vector search with match_nfts function
-    if (queryEmbedding) {
-      try {
-        console.log("Calling match_nfts function with embedding");
-        const { data: nfts, error } = await supabase.rpc(
-          'match_nfts',
-          {
-            query_embedding: queryEmbedding,
-            match_threshold: 0.5,
-            match_count: limit
-          }
-        );
-
-        if (error) {
-          console.error("Error calling match_nfts:", error);
-          throw error;
-        }
-
-        console.log(`Vector search found ${nfts?.length || 0} results`);
-        
-        // If no results from vector search and we have a query, try text search
-        if ((!nfts || nfts.length === 0) && query) {
-          console.log("No vector search results, falling back to text search");
-          const results = await performTextSearch();
-          return new Response(
-            JSON.stringify({ results }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        
-        return new Response(
-          JSON.stringify({ results: nfts || [] }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      } catch (error) {
-        console.error("Vector search error:", error);
-        // Fall back to text search if vector search fails and we have a query
-        if (query) {
-          console.log("Vector search failed, falling back to text search");
-          const results = await performTextSearch();
-          return new Response(
-            JSON.stringify({ results }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        
-        return new Response(
-          JSON.stringify({ error: "Vector search failed", details: error.message, results: [] }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    }
-
-    // This should never happen but just in case
-    console.error("No search method was executed");
+    console.log(`Returning ${processedResults.length} results`);
+    
+    // Return the search results with CORS headers
     return new Response(
-      JSON.stringify({ error: "Invalid search parameters", results: [] }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ 
+        results: processedResults,
+        count: processedResults.length
+      }),
+      { 
+        headers: { 
+          ...corsHeaders,
+          "Content-Type": "application/json" 
+        } 
+      }
     );
+    
   } catch (error) {
-    console.error("Error searching NFTs:", error);
+    console.error("Error processing search request:", error);
+    
+    // Return a proper error response with CORS headers
     return new Response(
-      JSON.stringify({ error: error.message || "Internal server error", results: [] }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ 
+        error: error.message || "An error occurred during search",
+        results: [] 
+      }),
+      { 
+        status: 400, 
+        headers: { 
+          ...corsHeaders,
+          "Content-Type": "application/json" 
+        } 
+      }
     );
   }
 });
