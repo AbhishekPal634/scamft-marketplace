@@ -319,6 +319,8 @@ export const useNFTStore = create<NFTStore>((set, get) => ({
         throw ownedError;
       }
       
+      console.log('Fetched owned NFTs:', ownedNfts);
+      
       const mappedNfts = await Promise.all(ownedNfts.map(mapDbNftToNft));
       set({ isLoading: false });
       return mappedNfts;

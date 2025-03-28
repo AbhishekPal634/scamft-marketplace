@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useNFTStore, NFT, Purchase } from "@/services/nftService";
@@ -29,10 +30,12 @@ const Profile = () => {
           
           // Get user's NFTs from purchases
           const nfts = await getUserNfts(user.id);
+          console.log("Fetched user NFTs:", nfts);
           setUserNfts(nfts);
           
           // Get user's purchase history
           const purchaseHistory = await getUserPurchases(user.id);
+          console.log("Fetched purchase history:", purchaseHistory);
           setPurchases(purchaseHistory);
           
           // Check for success parameter in URL
