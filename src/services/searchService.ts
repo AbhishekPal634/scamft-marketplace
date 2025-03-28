@@ -1,7 +1,7 @@
 
 import { NFT, useNFTStore } from "./nftService";
 import { supabase } from "../integrations/supabase/client";
-import { toast } from "../components/ui/use-toast";
+import { toast } from "../hooks/use-toast";
 
 // Define a type for the search response
 interface SearchResponse {
@@ -102,7 +102,6 @@ const mapNFTFromDatabase = (item: any): NFT => ({
     available: item.editions_available || 1,
   },
   likes: item.likes || 0,
-  views: item.views || 0,
   isLiked: false,
   listed: item.listed !== false,
   owner_id: item.owner_id || item.creator_id,
@@ -122,12 +121,12 @@ export const searchNFTsByText = async (query: string): Promise<NFT[]> => {
     // Add additional encoding to ensure the query is properly sent
     const requestBody = JSON.stringify({ query: query.trim(), limit: 20 });
     
-    // Use direct fetch with the supabase URL and key
-    const supabaseUrl = supabase.auth.getSession().then(({ data }) => data?.session?.access_token);
+    // Fixed the URL access - Use direct fetch with the proper URL construction
+    const supabaseAuthUrl = supabase.auth.getURL();
     
     // Use direct fetch instead of supabase.functions.invoke to avoid potential issues
     const response = await fetch(
-      `${supabase.auth.url}/functions/v1/search-nfts`,
+      `${supabaseAuthUrl}/functions/v1/search-nfts`,
       {
         method: 'POST',
         headers: {
