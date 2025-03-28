@@ -1,8 +1,8 @@
-
 import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { NFT } from "@/services/nftService";
 import { toast } from "@/components/ui/use-toast";
+import { searchNFTsByText } from "@/services/searchService";
 
 // Define a type for the search response
 export interface SearchResponse {
@@ -46,66 +46,11 @@ export const useSearch = () => {
     try {
       console.log("Searching for:", query);
       
-      const { data, error: funcError } = await supabase.functions.invoke<SearchResponse>('search-nfts', {
-        body: { query },
-        headers: {
-          "Content-Type": "application/json"
-        }
-      });
+      // Use the searchNFTsByText function from searchService which has better error handling
+      const nfts = await searchNFTsByText(query);
       
-      // Check if there was an error with the function call
-      if (funcError) {
-        console.error("Search function error:", funcError);
-        throw new Error(funcError.message);
-      }
-      
-      if (!data) {
-        console.warn("Search returned no data");
-        setResults([]);
-        return;
-      }
-
-      if (data.error) {
-        console.error("Search returned an error:", data.error);
-        throw new Error(data.error);
-      }
-
-      if (!data.results || !Array.isArray(data.results)) {
-        console.warn("Search returned no results array");
-        setResults([]);
-        return;
-      }
-
-      console.log(`Search returned ${data.results.length} results`);
-
-      // Map the raw database results to NFT objects
-      const mappedResults: NFT[] = data.results.map((item) => ({
-        id: item.id,
-        title: item.title || "Untitled NFT",
-        description: item.description || "",
-        price: typeof item.price === 'number' ? item.price : parseFloat(String(item.price)) || 0,
-        image: item.image_url || "/placeholder.svg",
-        image_url: item.image_url || "/placeholder.svg",
-        creator: {
-          id: item.creator_id || "0",
-          name: item.creator_name || "Unknown Artist",
-          avatar: item.creator_avatar || "/placeholder.svg",
-        },
-        createdAt: item.created_at || new Date().toISOString(),
-        tags: item.tags || [],
-        category: item.category || "Art",
-        editions: {
-          total: item.editions_total || 1,
-          available: item.editions_available || 1,
-        },
-        likes: item.likes || 0,
-        views: item.views || 0,
-        isLiked: false,
-        listed: item.listed !== false,
-        owner_id: item.owner_id || item.creator_id, // Use owner_id if present, fall back to creator_id
-      }));
-
-      setResults(mappedResults);
+      console.log(`Search returned ${nfts.length} results`);
+      setResults(nfts);
     } catch (err: any) {
       console.error("Search error:", err);
       const errorMessage = err.message || "Failed to search NFTs";

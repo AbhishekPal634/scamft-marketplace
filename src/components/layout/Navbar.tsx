@@ -1,8 +1,7 @@
-
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "@/context/AuthContext";
-import { Button } from "@/components/ui/button";
+import { useAuth } from "../../context/AuthContext";
+import { Button } from "../../components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,15 +9,15 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+} from "../../components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetTrigger } from "../../components/ui/sheet";
+import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
 import { Menu, X, Search, ShoppingCart, User } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { useSearch } from "@/hooks/useSearch";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { useCartStore } from "@/services/cartService";
-import { Badge } from "@/components/ui/badge";
+import { Input } from "../../components/ui/input";
+import { useSearch } from "../../hooks/useSearch";
+import { useIsMobile } from "../../hooks/use-mobile";
+import { useCartStore } from "../../services/cartService";
+import { Badge } from "../../components/ui/badge";
 
 const Navbar = () => {
   const { user, signOut } = useAuth();
@@ -61,12 +60,11 @@ const Navbar = () => {
   };
 
   const closeMenu = () => setOpen(false);
-
   const userNavItems = [
-    { label: "Profile", href: "/profile", icon: <User className="h-4 w-4 mr-2" /> },
-    { label: "My NFTs", href: "/profile", icon: <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg> },
-    { label: "My Listings", href: "/my-listings", icon: <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg> },
-    { label: "Create NFT", href: "/create", icon: <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg> },
+    { id: "profile", label: "Profile", href: "/profile", icon: <User className="h-4 w-4 mr-2" /> },
+    { id: "my-nfts", label: "My NFTs", href: "/profile?tab=collection", icon: <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg> },
+    { id: "listings", label: "My Listings", href: "/my-listings", icon: <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg> },
+    { id: "create", label: "Create NFT", href: "/create", icon: <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg> },
   ];
 
   const authButtons = (
@@ -85,7 +83,7 @@ const Navbar = () => {
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
             {userNavItems.map((item) => (
-              <DropdownMenuItem key={item.href} asChild>
+              <DropdownMenuItem key={item.id} asChild>
                 <Link to={item.href} className="flex items-center">
                   {item.icon}
                   {item.label}
@@ -150,7 +148,7 @@ const Navbar = () => {
               <>
                 {userNavItems.map((item) => (
                   <Link
-                    key={item.href}
+                    key={item.id}
                     to={item.href}
                     className="px-2 py-1 text-lg hover:text-primary flex items-center"
                     onClick={closeMenu}

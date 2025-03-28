@@ -1,17 +1,16 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Heart, Share2, Download, ShoppingCart, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/components/ui/use-toast";
-import BlurImage from "@/components/ui/BlurImage";
-import { useNFTStore, NFT } from "@/services/nftService";
-import { useCartStore } from "@/services/cartService";
-import { useAuth } from "@/context/AuthContext";
+import { Button } from "../../components/ui/button";
+import { Separator } from "../../components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
+import { Badge } from "../../components/ui/badge";
+import { useToast } from "../../components/ui/use-toast";
+import BlurImage from "../../components/ui/BlurImage";
+import { useNFTStore, NFT } from "../../services/nftService";
+import { useCartStore } from "../../services/cartService";
+import { useAuth } from "../../context/AuthContext";
 import RelatedNFTs from "./RelatedNFTs";
 
 const NFTDetail = () => {

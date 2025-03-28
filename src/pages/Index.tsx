@@ -1,13 +1,12 @@
-
 import { useEffect } from "react";
-import { useNFTStore } from "@/services/nftService";
-import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
-import Hero from "@/components/home/Hero";
-import FeaturedNFTs from "@/components/home/FeaturedNFTs";
+import { useNFTStore } from "../services/nftService";
+import Navbar from "../components/layout/Navbar";
+import Footer from "../components/layout/Footer";
+import Hero from "../components/home/Hero";
+import FeaturedNFTs from "../components/home/FeaturedNFTs";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
+import { Button } from "../components/ui/button";
 import { ArrowRight, Rocket, Shield, Zap } from "lucide-react";
 
 const Index = () => {

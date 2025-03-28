@@ -1,10 +1,9 @@
-
 import { useEffect } from "react";
 import { useParams } from "react-router-dom";
-import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
-import NFTDetailComponent from "@/components/nft/NFTDetail";
-import { useNFTStore } from "@/services/nftService";
+import Navbar from "../components/layout/Navbar";
+import Footer from "../components/layout/Footer";
+import NFTDetailComponent from "../components/nft/NFTDetail";
+import { useNFTStore } from "../services/nftService";
 
 const NFTDetail = () => {
   const { id } = useParams<{ id: string }>();

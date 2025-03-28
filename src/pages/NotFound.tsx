@@ -1,11 +1,10 @@
-
 import { useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Home } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
+import { Button } from "../components/ui/button";
+import Navbar from "../components/layout/Navbar";
+import Footer from "../components/layout/Footer";
 
 const NotFound = () => {
   const navigate = useNavigate();

@@ -1,19 +1,18 @@
-
 import { Routes, Route } from "react-router-dom";
-import { Toaster } from "@/components/ui/toaster";
-import { AuthProvider } from "@/context/AuthContext";
-import Index from "@/pages/Index";
-import Explore from "@/pages/Explore";
-import NFTDetail from "@/pages/NFTDetail";
-import Cart from "@/pages/Cart";
-import Checkout from "@/pages/Checkout";
-import Login from "@/pages/Login";
-import Register from "@/pages/Register";
-import NotFound from "@/pages/NotFound";
-import ProtectedRoute from "@/components/auth/ProtectedRoute";
-import Profile from "@/pages/Profile";
-import CreateListing from "@/pages/CreateListing";
-import MyListings from "@/pages/MyListings";
+import { Toaster } from "./components/ui/toaster";
+import { AuthProvider } from "./context/AuthContext";
+import Index from "./pages/Index";
+import Explore from "./pages/Explore";
+import NFTDetail from "./pages/NFTDetail";
+import Cart from "./pages/Cart";
+import Checkout from "./pages/Checkout";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import NotFound from "./pages/NotFound";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
+import Profile from "./pages/Profile";
+import CreateListing from "./pages/CreateListing";
+import MyListings from "./pages/MyListings";
 
 function App() {
   return (

@@ -1,14 +1,13 @@
-
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Heart, Share2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/components/ui/use-toast";
-import BlurImage from "@/components/ui/BlurImage";
-import { NFT, useNFTStore } from "@/services/nftService";
-import { useCartStore } from "@/services/cartService";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/context/AuthContext";
+import { Button } from "../../components/ui/button";
+import { useToast } from "../../components/ui/use-toast";
+import BlurImage from "../../components/ui/BlurImage";
+import { NFT, useNFTStore } from "../../services/nftService";
+import { useCartStore } from "../../services/cartService";
+import { supabase } from "../../integrations/supabase/client";
+import { useAuth } from "../../context/AuthContext";
 
 interface NFTCardProps {
   nft: NFT;

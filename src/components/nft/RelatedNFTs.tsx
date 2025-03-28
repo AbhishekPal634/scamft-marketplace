@@ -1,6 +1,6 @@
-
 import { useEffect, useState } from 'react';
-import { useNFTStore, NFT } from '@/services/nftService';
+import { NFT } from '../../services/nftService';
+import { findSimilarNFTs } from '../../services/searchService';
 import NFTCard from './NFTCard';
 import { Loader2 } from 'lucide-react';
 
@@ -9,31 +9,32 @@ interface RelatedNFTsProps {
   tags: string[];
 }
 
-const RelatedNFTs = ({ currentNftId, tags }: RelatedNFTsProps) => {
-  const { nfts, fetchNFTs, isLoading } = useNFTStore();
+const RelatedNFTs = ({ currentNftId }: RelatedNFTsProps) => {
   const [relatedNFTs, setRelatedNFTs] = useState<NFT[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get related NFTs based on shared tags, excluding the current NFT
-    if (nfts.length > 0) {
-      const related = nfts
-        .filter(
-          (nft) => 
-            nft.id !== currentNftId && 
-            nft.tags?.some((tag) => tags.includes(tag))
-        )
-        .slice(0, 4); // Limit to 4 related items
-      
-      setRelatedNFTs(related);
-      setLoading(false);
-    } else {
-      // Fetch NFTs if not already loaded
-      fetchNFTs().then(() => setLoading(false));
-    }
-  }, [nfts, currentNftId, tags, fetchNFTs]);
+    const fetchRelatedNFTs = async () => {
+      try {
+        setLoading(true);
+        
+        // Use vector search to find similar NFTs
+        const similarNFTs = await findSimilarNFTs(currentNftId, 4);
+        setRelatedNFTs(similarNFTs);
+      } catch (error) {
+        console.error("Error fetching related NFTs:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  if (loading || isLoading) {
+    // Fetch related NFTs when the component mounts or currentNftId changes
+    if (currentNftId) {
+      fetchRelatedNFTs();
+    }
+  }, [currentNftId]);
+
+  if (loading) {
     return (
       <div className="flex justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

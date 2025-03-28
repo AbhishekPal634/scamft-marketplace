@@ -1,38 +1,49 @@
-
 import { NFT, useNFTStore } from "./nftService";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
+import { supabase } from "../integrations/supabase/client";
+import { toast } from "../components/ui/use-toast";
 
 // Define a type for the search response
 interface SearchResponse {
   results: any[];
-  [key: string]: any;
+  count: number;
+  error?: string;
 }
 
 // This function uses the Supabase edge function for proper search
 export const searchNFTsByText = async (query: string): Promise<NFT[]> => {
   try {
-    console.log("Searching for NFTs with query:", query);
-    
-    const { data, error: funcError } = await supabase.functions.invoke<SearchResponse>('search-nfts', {
-      body: { query, limit: 20 },
-      headers: {
-        "Content-Type": "application/json"
-      }
-    });
-    
-    if (funcError) {
-      console.error("Search error:", funcError);
-      toast({
-        title: "Search Failed",
-        description: "Using local search as fallback",
-        variant: "destructive"
-      });
-      
-      // Fallback to local search
-      return fallbackLocalSearch(query);
+    // Validate query before sending to edge function
+    if (!query || query.trim() === '') {
+      console.log("Empty query, returning empty results");
+      return [];
     }
 
+    console.log("Searching for NFTs with query:", query);
+    
+    // Add additional encoding to ensure the query is properly sent
+    const requestBody = JSON.stringify({ query: query.trim(), limit: 20 });
+    
+    // Use direct fetch instead of supabase.functions.invoke to avoid potential issues
+    const response = await fetch(
+      `${supabase.supabaseUrl}/functions/v1/search-nfts`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabase.supabaseKey}`
+        },
+        body: requestBody
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Search error response:", errorText);
+      throw new Error(`Search request failed: ${response.status} ${response.statusText}`);
+    }
+
+    const data: SearchResponse = await response.json();
+    
     if (!data || !data.results) {
       console.warn("Search returned no data or results property");
       return fallbackLocalSearch(query);
@@ -70,6 +81,11 @@ export const searchNFTsByText = async (query: string): Promise<NFT[]> => {
     return mappedResults;
   } catch (error) {
     console.error("Search error:", error);
+    toast({
+      title: "Search Failed",
+      description: "Using local search as fallback",
+      variant: "destructive"
+    });
     
     return fallbackLocalSearch(query);
   }
@@ -98,42 +114,4 @@ const fallbackLocalSearch = async (query: string): Promise<NFT[]> => {
     
     return titleMatch || descMatch || tagMatch || categoryMatch;
   });
-};
-
-// Find similar NFTs to a given NFT
-export const findSimilarNFTs = async (nftId: string, limit = 4): Promise<NFT[]> => {
-  const store = useNFTStore.getState();
-  const nft = store.getNFTById(nftId);
-  
-  if (!nft) {
-    return [];
-  }
-  
-  try {
-    console.log("Finding similar NFTs using tag-based similarity");
-    
-    // Use tag-based similarity
-    const allNFTs = store.nfts.length > 0 
-      ? store.nfts.filter(item => item.id !== nftId && item.listed !== false)
-      : (await store.fetchMarketplaceNFTs()).filter(item => item.id !== nftId);
-      
-    // Score NFTs by number of matching tags
-    const scoredNfts = allNFTs.map(item => {
-      const matchingTags = item.tags?.filter(tag => nft.tags.includes(tag)).length || 0;
-      const categoryMatch = item.category === nft.category ? 1 : 0;
-      return { 
-        ...item, 
-        score: matchingTags + categoryMatch
-      };
-    });
-    
-    // Sort by score and return top matches
-    return scoredNfts
-      .sort((a, b) => (b as any).score - (a as any).score)
-      .slice(0, limit);
-      
-  } catch (error) {
-    console.error("Error finding similar NFTs:", error);
-    return [];
-  }
 };

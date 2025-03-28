@@ -1,8 +1,8 @@
-
-import { createContext, useContext, useEffect, useState } from "react";
+import { useState, useEffect, createContext, useContext } from "react";
 import { useNavigate } from "react-router-dom";
-import { Session, User } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "../integrations/supabase/client";
+import { type Session, type User } from "@supabase/supabase-js";
+import { useToast } from "../hooks/use-toast";
 
 type AuthContextType = {
   user: User | null;

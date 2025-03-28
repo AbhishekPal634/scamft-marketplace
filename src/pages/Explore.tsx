@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -8,16 +7,16 @@ import {
   X, 
   SlidersHorizontal,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
-import { Separator } from "@/components/ui/separator";
+import { Button } from "../components/ui/button";
+import { Slider } from "../components/ui/slider";
+import { Separator } from "../components/ui/separator";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "../components/ui/select";
 import {
   Sheet,
   SheetContent,
@@ -26,13 +25,13 @@ import {
   SheetDescription,
   SheetClose,
   SheetTrigger,
-} from "@/components/ui/sheet";
-import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
-import NFTCard from "@/components/nft/NFTCard";
-import SearchBar from "@/components/search/SearchBar";
-import { useNFTStore, NFTFilters, NFT } from "@/services/nftService";
-import { useSearch } from "@/hooks/useSearch";
+} from "../components/ui/sheet";
+import Navbar from "../components/layout/Navbar";
+import Footer from "../components/layout/Footer";
+import NFTCard from "../components/nft/NFTCard";
+import SearchBar from "../components/search/SearchBar";
+import { useNFTStore, NFTFilters, NFT } from "../services/nftService";
+import { useSearch } from "../hooks/useSearch";
 
 const Explore = () => {
   const location = useLocation();

@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search as SearchIcon } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { useSearch } from "@/hooks/useSearch";
+import { Input } from "../../components/ui/input";
+import { Button } from "../../components/ui/button";
+import { useSearch } from "../../hooks/useSearch";
 
 interface SearchBarProps {
   className?: string;
