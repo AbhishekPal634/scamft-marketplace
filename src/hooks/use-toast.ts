@@ -5,14 +5,15 @@ import {
   ToastProps,
 } from "../components/ui/toast";
 
-import {
-  useToast as useToastOriginal,
-  toast as toastOriginal
-} from "@/components/ui/toaster";
+// Import the hook directly from the source
+import { useToast as useToastOriginal } from "../components/ui/toast";
+import { Toaster } from "../components/ui/toaster";
 
-// Re-export with new names to avoid circular references
+// Create a toast function that can be used throughout the app
+export const toast = useToastOriginal().toast;
+
+// Re-export the hook to avoid circular references
 export const useToast = useToastOriginal;
-export const toast = toastOriginal;
 
 export type {
   Toast,

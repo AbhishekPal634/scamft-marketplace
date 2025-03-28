@@ -121,17 +121,18 @@ export const searchNFTsByText = async (query: string): Promise<NFT[]> => {
     // Add additional encoding to ensure the query is properly sent
     const requestBody = JSON.stringify({ query: query.trim(), limit: 20 });
     
-    // Fixed the URL access - Use direct fetch with the proper URL construction
-    const supabaseAuthUrl = supabase.auth.getURL();
+    // Use the correct approach to get the Supabase URL
+    const { data } = await supabase.auth.getSession();
+    const supabaseUrl = supabase.supabaseUrl; // Use the built-in property
     
     // Use direct fetch instead of supabase.functions.invoke to avoid potential issues
     const response = await fetch(
-      `${supabaseAuthUrl}/functions/v1/search-nfts`,
+      `${supabaseUrl}/functions/v1/search-nfts`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await supabase.auth.getSession().then(({ data }) => data?.session?.access_token)}`
+          'Authorization': `Bearer ${data?.session?.access_token}`
         },
         body: requestBody
       }
