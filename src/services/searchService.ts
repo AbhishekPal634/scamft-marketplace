@@ -123,8 +123,10 @@ export const searchNFTsByText = async (query: string): Promise<NFT[]> => {
     
     // Use the correct approach to get the Supabase URL and session
     const { data: sessionData } = await supabase.auth.getSession();
-    // Get URL from the Supabase instance - avoid using protected property
-    const supabaseApiUrl = `${supabase.supabaseUrl}/functions/v1/search-nfts`;
+    
+    // Get URL from the Supabase instance properly
+    const baseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ntmogcnenelmbggucipy.supabase.co';
+    const supabaseApiUrl = `${baseUrl}/functions/v1/search-nfts`;
     
     // Use direct fetch instead of supabase.functions.invoke to avoid potential issues
     const response = await fetch(
