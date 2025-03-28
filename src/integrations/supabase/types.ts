@@ -70,6 +70,7 @@ export type Database = {
           image_url: string
           likes: number | null
           listed: boolean | null
+          owner_id: string | null
           price: number
           tags: string[] | null
           title: string
@@ -88,6 +89,7 @@ export type Database = {
           image_url: string
           likes?: number | null
           listed?: boolean | null
+          owner_id?: string | null
           price: number
           tags?: string[] | null
           title: string
@@ -106,6 +108,7 @@ export type Database = {
           image_url?: string
           likes?: number | null
           listed?: boolean | null
+          owner_id?: string | null
           price?: number
           tags?: string[] | null
           title?: string
@@ -116,6 +119,13 @@ export type Database = {
           {
             foreignKeyName: "nfts_creator_id_fkey"
             columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nfts_owner_id_fkey"
+            columns: ["owner_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -241,6 +251,30 @@ export type Database = {
             }
             Returns: unknown
           }
+      calculate_nft_stats: {
+        Args: {
+          nft_id_param: string
+        }
+        Returns: {
+          total_sales: number
+          total_value: number
+          unique_owners: number
+          avg_sale_price: number
+        }[]
+      }
+      find_similar_nfts: {
+        Args: {
+          nft_id: string
+          match_count: number
+        }
+        Returns: {
+          id: string
+          title: string
+          price: number
+          image_url: string
+          similarity: number
+        }[]
+      }
       halfvec_avg: {
         Args: {
           "": number[]

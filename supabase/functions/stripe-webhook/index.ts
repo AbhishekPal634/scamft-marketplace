@@ -47,6 +47,8 @@ serve(async (req) => {
         const session = event.data.object;
         const userId = session.metadata.userId;
         
+        console.log(`Processing checkout session: ${session.id} for user ${userId}`);
+        
         // Create a purchase record in Supabase
         const { data: purchase, error: purchaseError } = await supabase
           .from("purchases")
