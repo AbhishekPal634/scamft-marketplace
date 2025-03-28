@@ -111,12 +111,19 @@ const ToastDescription = React.forwardRef<
 ))
 ToastDescription.displayName = ToastPrimitives.Description.displayName
 
-// Define the ToastProps interface with all required properties
-export interface ToastProps extends React.ComponentPropsWithoutRef<typeof Toast> {
+// Define the ToastActionElement type
+export type ToastActionElement = React.ReactElement<typeof ToastAction>
+
+// Define the ToastProps interface correctly to prevent circular references
+export interface ToastProps {
   id?: string;
   title?: React.ReactNode;
   description?: React.ReactNode;
   action?: ToastActionElement;
+  variant?: "default" | "destructive";
+  className?: string;
+  onOpenChange?: (open: boolean) => void;
+  open?: boolean;
 }
 
 // Export the useToast hook functionality
