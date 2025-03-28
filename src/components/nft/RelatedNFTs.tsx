@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { NFT } from '../../services/nftService';
 import { findSimilarNFTs } from '../../services/searchService';
@@ -9,7 +10,7 @@ interface RelatedNFTsProps {
   tags: string[];
 }
 
-const RelatedNFTs = ({ currentNftId }: RelatedNFTsProps) => {
+const RelatedNFTs = ({ currentNftId, tags }: RelatedNFTsProps) => {
   const [relatedNFTs, setRelatedNFTs] = useState<NFT[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -18,7 +19,7 @@ const RelatedNFTs = ({ currentNftId }: RelatedNFTsProps) => {
       try {
         setLoading(true);
         
-        // Use vector search to find similar NFTs
+        // Use the findSimilarNFTs function to find related NFTs
         const similarNFTs = await findSimilarNFTs(currentNftId, 4);
         setRelatedNFTs(similarNFTs);
       } catch (error) {
