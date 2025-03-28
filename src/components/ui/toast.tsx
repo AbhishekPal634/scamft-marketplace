@@ -1,3 +1,4 @@
+
 import * as React from "react"
 import * as ToastPrimitives from "@radix-ui/react-toast"
 import { cva, type VariantProps } from "class-variance-authority"
@@ -113,6 +114,42 @@ ToastDescription.displayName = ToastPrimitives.Description.displayName
 type ToastProps = React.ComponentPropsWithoutRef<typeof Toast>
 
 type ToastActionElement = React.ReactElement<typeof ToastAction>
+
+// Export the useToast hook functionality
+export const useToast = () => {
+  const [toasts, setToasts] = React.useState<ToastProps[]>([]);
+
+  const toast = React.useCallback(
+    ({ ...props }: ToastProps) => {
+      const id = props.id || Math.random().toString(36).substring(2, 9);
+      setToasts((prevToasts) => [...prevToasts, { id, ...props }]);
+      return id;
+    },
+    []
+  );
+
+  const dismiss = React.useCallback((toastId?: string) => {
+    setToasts((prevToasts) =>
+      prevToasts.filter((toast) => (toastId ? toast.id !== toastId : true))
+    );
+  }, []);
+
+  const update = React.useCallback((props: { id: string } & Partial<ToastProps>) => {
+    if (!props.id) return;
+    setToasts((prevToasts) =>
+      prevToasts.map((toast) =>
+        toast.id === props.id ? { ...toast, ...props } : toast
+      )
+    );
+  }, []);
+
+  return {
+    toast,
+    dismiss,
+    update,
+    toasts,
+  };
+};
 
 export {
   type ToastProps,

@@ -3,14 +3,13 @@ import {
   Toast,
   ToastActionElement,
   ToastProps,
+  useToast as useToastOriginal
 } from "../components/ui/toast";
 
-// Import the hook directly from the source
-import { useToast as useToastOriginal } from "../components/ui/toast";
-import { Toaster } from "../components/ui/toaster";
-
 // Create a toast function that can be used throughout the app
-export const toast = useToastOriginal().toast;
+export const toast = (props: ToastProps) => {
+  return useToastOriginal().toast(props);
+};
 
 // Re-export the hook to avoid circular references
 export const useToast = useToastOriginal;

@@ -121,18 +121,19 @@ export const searchNFTsByText = async (query: string): Promise<NFT[]> => {
     // Add additional encoding to ensure the query is properly sent
     const requestBody = JSON.stringify({ query: query.trim(), limit: 20 });
     
-    // Use the correct approach to get the Supabase URL
-    const { data } = await supabase.auth.getSession();
-    const supabaseUrl = supabase.supabaseUrl; // Use the built-in property
+    // Use the correct approach to get the Supabase URL and session
+    const { data: sessionData } = await supabase.auth.getSession();
+    // Get URL from the Supabase instance - avoid using protected property
+    const supabaseApiUrl = `${supabase.supabaseUrl}/functions/v1/search-nfts`;
     
     // Use direct fetch instead of supabase.functions.invoke to avoid potential issues
     const response = await fetch(
-      `${supabaseUrl}/functions/v1/search-nfts`,
+      supabaseApiUrl,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${data?.session?.access_token}`
+          'Authorization': `Bearer ${sessionData?.session?.access_token}`
         },
         body: requestBody
       }
@@ -144,17 +145,17 @@ export const searchNFTsByText = async (query: string): Promise<NFT[]> => {
       throw new Error(`Search request failed: ${response.status} ${response.statusText}`);
     }
 
-    const data: SearchResponse = await response.json();
+    const responseData: SearchResponse = await response.json();
     
-    if (!data || !data.results) {
+    if (!responseData || !responseData.results) {
       console.warn("Search returned no data or results property");
       return fallbackLocalSearch(query);
     }
 
-    console.log(`Search returned ${data.results.length} results`);
+    console.log(`Search returned ${responseData.results.length} results`);
 
     // Map the raw database results to NFT objects
-    const mappedResults: NFT[] = data.results.map(mapNFTFromDatabase);
+    const mappedResults: NFT[] = responseData.results.map(mapNFTFromDatabase);
 
     return mappedResults;
   } catch (error) {
