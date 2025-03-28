@@ -112,10 +112,10 @@ const ToastDescription = React.forwardRef<
 ToastDescription.displayName = ToastPrimitives.Description.displayName
 
 // Define the ToastActionElement type
-export type ToastActionElement = React.ReactElement<typeof ToastAction>
+type ToastActionElement = React.ReactElement<typeof ToastAction>
 
 // Define the ToastProps interface correctly to prevent circular references
-export interface ToastProps {
+interface ToastProps {
   id?: string;
   title?: React.ReactNode;
   description?: React.ReactNode;
@@ -127,7 +127,7 @@ export interface ToastProps {
 }
 
 // Export the useToast hook functionality
-export const useToast = () => {
+const useToast = () => {
   const [toasts, setToasts] = React.useState<ToastProps[]>([]);
 
   const toast = React.useCallback(
@@ -163,7 +163,6 @@ export const useToast = () => {
 };
 
 export {
-  type ToastActionElement,
   ToastProvider,
   ToastViewport,
   Toast,
@@ -171,4 +170,7 @@ export {
   ToastDescription,
   ToastClose,
   ToastAction,
+  useToast,
+  type ToastProps,
+  type ToastActionElement,
 }
