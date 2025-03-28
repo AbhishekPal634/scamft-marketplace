@@ -115,3 +115,160 @@ const fallbackLocalSearch = async (query: string): Promise<NFT[]> => {
     return titleMatch || descMatch || tagMatch || categoryMatch;
   });
 };
+
+// Function to find similar NFTs using vector similarity
+export const findSimilarNFTs = async (nftId: string, limit: number = 4): Promise<NFT[]> => {
+  try {
+    console.log(`Finding similar NFTs for ${nftId}`);
+    
+    // Call the Supabase function to find similar NFTs
+    const { data, error } = await supabase.rpc(
+      'find_similar_nfts',
+      { 
+        nft_id: nftId,
+        match_count: limit 
+      }
+    );
+    
+    if (error) {
+      console.error("Error finding similar NFTs:", error);
+      throw error;
+    }
+    
+    if (!data || data.length === 0) {
+      console.log("No similar NFTs found");
+      
+      // Fallback to tag-based similarity
+      return fallbackSimilarNFTs(nftId, limit);
+    }
+    
+    // Fetch full NFT details for the similar NFTs
+    const nftIds = data.map((item: any) => item.id);
+    
+    const { data: nftsData, error: nftsError } = await supabase
+      .from('nfts')
+      .select('*')
+      .in('id', nftIds)
+      .eq('listed', true)
+      .limit(limit);
+      
+    if (nftsError) {
+      console.error("Error fetching similar NFT details:", nftsError);
+      throw nftsError;
+    }
+    
+    // Map the raw database results to NFT objects
+    const store = useNFTStore.getState();
+    const mappedNfts = await Promise.all(nftsData.map(store.mapDbNftToNft || mapSimpleNft));
+    
+    return mappedNfts;
+  } catch (error) {
+    console.error("Error in findSimilarNFTs:", error);
+    return fallbackSimilarNFTs(nftId, limit);
+  }
+};
+
+// Simple mapper for NFTs when the store's mapper is not available
+const mapSimpleNft = async (dbNft: any): Promise<NFT> => {
+  let creatorName = "Artist";
+  let creatorAvatar = '/placeholder.svg';
+  
+  if (dbNft.creator_id) {
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', dbNft.creator_id)
+        .maybeSingle();
+      
+      if (error) {
+        console.error('Error fetching creator profile:', error);
+      }
+        
+      if (profile) {
+        creatorName = profile.full_name || profile.username || "Artist";
+        creatorAvatar = profile.avatar_url || '/placeholder.svg';
+      }
+    } catch (error) {
+      console.error('Error fetching creator profile:', error);
+    }
+  }
+  
+  return {
+    id: dbNft.id,
+    title: dbNft.title || 'Untitled NFT',
+    description: dbNft.description || '',
+    price: parseFloat(dbNft.price) || 0,
+    image: dbNft.image_url || '/placeholder.svg',
+    image_url: dbNft.image_url || '/placeholder.svg',
+    creator: {
+      id: dbNft.creator_id || '0',
+      name: creatorName,
+      avatar: creatorAvatar,
+    },
+    createdAt: dbNft.created_at || new Date().toISOString(),
+    tags: dbNft.tags || [],
+    category: dbNft.category || 'Art',
+    editions: {
+      total: dbNft.editions_total || 1,
+      available: dbNft.editions_available || 1,
+    },
+    likes: dbNft.likes || 0,
+    isLiked: false,
+    owner_id: dbNft.owner_id || dbNft.creator_id,
+    listed: dbNft.listed !== false,
+  };
+};
+
+// Fallback to find similar NFTs based on tags when vector search fails
+const fallbackSimilarNFTs = async (nftId: string, limit: number = 4): Promise<NFT[]> => {
+  console.log("Using tag-based fallback for similar NFTs");
+  
+  try {
+    // First get the original NFT
+    const { data: originalNft, error: originalError } = await supabase
+      .from('nfts')
+      .select('*')
+      .eq('id', nftId)
+      .maybeSingle();
+      
+    if (originalError || !originalNft) {
+      console.error("Error fetching original NFT:", originalError);
+      return [];
+    }
+    
+    // Get other NFTs with similar tags
+    const { data: similarNfts, error: similarError } = await supabase
+      .from('nfts')
+      .select('*')
+      .neq('id', nftId)  // Exclude the original NFT
+      .eq('listed', true)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+      
+    if (similarError || !similarNfts) {
+      console.error("Error fetching similar NFTs by tag:", similarError);
+      return [];
+    }
+    
+    // Sort by tag overlap
+    const originalTags = originalNft.tags || [];
+    const sortedNfts = similarNfts.sort((a, b) => {
+      const aTags = a.tags || [];
+      const bTags = b.tags || [];
+      
+      const aOverlap = aTags.filter(tag => originalTags.includes(tag)).length;
+      const bOverlap = bTags.filter(tag => originalTags.includes(tag)).length;
+      
+      return bOverlap - aOverlap;
+    });
+    
+    const store = useNFTStore.getState();
+    const mappedNfts = await Promise.all(sortedNfts.slice(0, limit).map(store.mapDbNftToNft || mapSimpleNft));
+    
+    return mappedNfts;
+  } catch (error) {
+    console.error("Error in fallbackSimilarNFTs:", error);
+    return [];
+  }
+};

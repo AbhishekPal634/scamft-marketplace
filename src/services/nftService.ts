@@ -66,12 +66,17 @@ const mapDbNftToNft = async (dbNft: any): Promise<NFT> => {
   
   if (dbNft.creator_id) {
     try {
-      const { data: profile } = await supabase
+      // Fix: Use a more compatible query format with proper headers
+      const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', dbNft.creator_id)
-        .single();
-        
+        .maybeSingle();
+      
+      if (error) {
+        console.error('Error fetching creator profile:', error);
+      }
+      
       if (profile) {
         creatorName = profile.full_name || profile.username || "Artist";
         creatorAvatar = profile.avatar_url || '/placeholder.svg';
