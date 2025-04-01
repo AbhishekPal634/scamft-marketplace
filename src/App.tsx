@@ -1,5 +1,6 @@
+
 import { Routes, Route } from "react-router-dom";
-import { Toaster } from "./components/ui/toaster";
+import { Toaster } from "sonner"; // Use Sonner's toaster component
 import { AuthProvider } from "./context/AuthContext";
 import Index from "./pages/Index";
 import Explore from "./pages/Explore";
@@ -46,7 +47,7 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
-      <Toaster />
+      <Toaster richColors position="top-right" />
     </AuthProvider>
   );
 }

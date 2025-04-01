@@ -1,17 +1,17 @@
 import * as React from "react"
-import { toast as sonnerToast, type ToasterToast } from "sonner"
+import { toast as sonnerToast, type Toast } from "sonner"
 import type { ToastActionElement, ToastProps } from "../components/ui/toast"
 
 const TOAST_LIMIT = 5;
 const TOAST_REMOVE_DELAY = 1000;
 
 type ToastState = {
-  toasts: ToasterToast[]
+  toasts: Array<ToastProps & { id: string }>
 }
 
-// Implementing the toast functionality directly instead of importing it
+// Implementing the toast functionality directly
 export const useToast = () => {
-  const [toasts, setToasts] = React.useState<ToasterToast[]>([]);
+  const [toasts, setToasts] = React.useState<Array<ToastProps & { id: string }>>([]);
 
   const toast = React.useCallback(
     ({ ...props }: ToastProps) => {
@@ -20,11 +20,11 @@ export const useToast = () => {
       setToasts((prev) => {
         // If we already have this toast, update it
         if (prev.some((t) => t.id === id)) {
-          return prev.map((t) => (t.id === id ? { ...t, ...props } : t));
+          return prev.map((t) => (t.id === id ? { ...t, ...props, id } : t));
         }
         
         // Otherwise, add the new toast, ensuring we don't exceed the limit
-        const newToasts = [...prev, { id, ...props }];
+        const newToasts = [...prev, { ...props, id }];
         return newToasts.slice(-TOAST_LIMIT);
       });
 
@@ -69,7 +69,6 @@ export const toast = (props: ToastProps) => {
     description: props.description,
     action: props.action,
     className: props.className,
-    duration: props.duration || 5000,
     ...props
   });
   
