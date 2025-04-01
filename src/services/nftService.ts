@@ -327,10 +327,10 @@ export const useNFTStore = create<NFTStore>((set, get) => ({
         console.log(`No NFTs found with owner_id = ${userId}`);
         
         // Let's also check if this user has made any purchases
+        // Fix the join operation by using the correct syntax
         const { data: purchaseItems } = await supabase
           .from('purchase_items')
-          .select('nft_id')
-          .join('purchases', 'purchase_items.purchase_id = purchases.id')
+          .select('nft_id, purchases!inner(*)')
           .eq('purchases.user_id', userId);
           
         console.log('User purchase items:', purchaseItems);
