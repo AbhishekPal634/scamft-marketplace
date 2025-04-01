@@ -101,7 +101,7 @@ serve(async (req) => {
                 continue;
               }
               
-              // Update the NFT to transfer ownership and remove from marketplace
+              // Update the NFT to transfer ownership to the buyer and remove from marketplace
               const { error: nftUpdateError } = await supabase
                 .from("nfts")
                 .update({ 

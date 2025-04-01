@@ -1,5 +1,6 @@
 
-import { useToast as useToastOriginal, type ToastProps, type ToastActionElement } from "../components/ui/toast";
+import { useToast as useToastOriginal } from "../components/ui/use-toast";
+import type { ToastProps, ToastActionElement } from "../components/ui/toast";
 
 // Create a toast function that can be used throughout the app
 export const toast = (props: ToastProps) => {

@@ -1,3 +1,4 @@
+
 import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -308,7 +309,7 @@ export const useNFTStore = create<NFTStore>((set, get) => ({
     try {
       set({ isLoading: true });
       
-      // Get NFTs owned by this user
+      // Get NFTs owned by this user - fix the query to ensure we're getting the right NFTs
       const { data: ownedNfts, error: ownedError } = await supabase
         .from('nfts')
         .select('*')
@@ -320,6 +321,20 @@ export const useNFTStore = create<NFTStore>((set, get) => ({
       }
       
       console.log('Fetched owned NFTs:', ownedNfts);
+      
+      // If we didn't find any NFTs, specifically log this so we can debug
+      if (!ownedNfts || ownedNfts.length === 0) {
+        console.log(`No NFTs found with owner_id = ${userId}`);
+        
+        // Let's also check if this user has made any purchases
+        const { data: purchaseItems } = await supabase
+          .from('purchase_items')
+          .select('nft_id')
+          .join('purchases', 'purchase_items.purchase_id = purchases.id')
+          .eq('purchases.user_id', userId);
+          
+        console.log('User purchase items:', purchaseItems);
+      }
       
       const mappedNfts = await Promise.all(ownedNfts.map(mapDbNftToNft));
       set({ isLoading: false });
