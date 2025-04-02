@@ -10,6 +10,23 @@ import { Loader2, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useSearchParams } from "react-router-dom";
+import { useCartStore } from "@/services/cartService";
+
+interface PurchaseNFT {
+  id: string;
+  title: string;
+  description: string;
+  image_url: string;
+}
+
+interface PurchaseItem {
+  id: string;
+  purchase_id: string;
+  nft_id: string;
+  quantity: number;
+  price_per_item: number;
+  nft?: PurchaseNFT;
+}
 
 const Profile = () => {
   const { user } = useAuth();
@@ -18,30 +35,45 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
   const [userNfts, setUserNfts] = useState<NFT[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [purchaseItems, setPurchaseItems] = useState<
+    Record<string, PurchaseItem[]>
+  >({});
   const [activeTab, setActiveTab] = useState("collection");
   const [searchParams] = useSearchParams();
-  
+  const { clearCart } = useCartStore();
+
   useEffect(() => {
     const fetchUserData = async () => {
       if (user) {
         try {
           setLoading(true);
-          
+
           // Get user's NFTs from purchases
           const nfts = await getUserNfts(user.id);
           setUserNfts(nfts);
-          
+
           // Get user's purchase history
           const purchaseHistory = await getUserPurchases(user.id);
           setPurchases(purchaseHistory);
-          
+
           // Check for success parameter in URL
-          if (searchParams.get('success') === 'true') {
+          if (searchParams.get("success") === "true") {
+            // Clear cart after successful purchase
+            clearCart();
+
+            // Refresh NFT data with a small delay to ensure database updates are complete
+            setTimeout(async () => {
+              const updatedNfts = await getUserNfts(user.id);
+              const updatedPurchases = await getUserPurchases(user.id);
+              setUserNfts(updatedNfts);
+              setPurchases(updatedPurchases);
+            }, 1000);
+
             toast({
               title: "Purchase Complete!",
-              description: "Your NFTs have been added to your collection."
+              description: "Your NFTs have been added to your collection.",
             });
-            
+
             // Set active tab to show purchases if coming from successful checkout
             setActiveTab("purchases");
           }
@@ -50,66 +82,95 @@ const Profile = () => {
           toast({
             title: "Error",
             description: "Failed to load your profile data. Please try again.",
-            variant: "destructive"
+            variant: "destructive",
           });
         } finally {
           setLoading(false);
         }
       }
     };
-    
+
     fetchUserData();
-  }, [user, getUserNfts, getUserPurchases, toast, searchParams]);
-  
-  const handleDownloadNFT = async (nft: NFT) => {
-    try {
-      // First check if image URL is from Supabase storage
-      if (nft.image && nft.image.includes("ntmogcnenelmbggucipy.supabase.co")) {
-        const imagePath = nft.image.split("/").pop();
-        
-        if (!imagePath) {
-          throw new Error("Invalid image URL");
+  }, [user, getUserNfts, getUserPurchases, toast, searchParams, clearCart]);
+
+  useEffect(() => {
+    const fetchPurchases = async () => {
+      if (!user) return;
+
+      try {
+        // Fetch purchases
+        const { data: purchasesData, error: purchasesError } = await supabase
+          .from("purchases")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+
+        if (purchasesError) throw purchasesError;
+
+        setPurchases(purchasesData || []);
+
+        // Fetch purchase items for each purchase
+        const purchaseIds = purchasesData?.map((p) => p.id) || [];
+        if (purchaseIds.length > 0) {
+          const { data: itemsData, error: itemsError } = await supabase
+            .from("purchase_items")
+            .select(
+              `
+              id,
+              purchase_id,
+              nft_id,
+              quantity,
+              price_per_item,
+              nft:nfts!inner (
+                id,
+                title,
+                description,
+                image_url
+              )
+            `
+            )
+            .in("purchase_id", purchaseIds)
+            .order("created_at", { ascending: false });
+
+          if (itemsError) throw itemsError;
+
+          // Group items by purchase_id
+          const itemsByPurchase = itemsData?.reduce((acc, item: any) => {
+            if (!acc[item.purchase_id]) {
+              acc[item.purchase_id] = [];
+            }
+
+            // Transform the item to match our types
+            const purchaseItem: PurchaseItem = {
+              id: item.id,
+              purchase_id: item.purchase_id,
+              nft_id: item.nft_id,
+              quantity: item.quantity,
+              price_per_item: item.price_per_item,
+              nft: item.nft && {
+                id: item.nft.id,
+                title: item.nft.title,
+                description: item.nft.description || "",
+                image_url: item.nft.image_url,
+              },
+            };
+
+            acc[item.purchase_id].push(purchaseItem);
+            return acc;
+          }, {} as Record<string, PurchaseItem[]>);
+
+          setPurchaseItems(itemsByPurchase || {});
         }
-        
-        // Download from Supabase storage
-        const { data, error } = await supabase.storage
-          .from("nft-images")
-          .download(imagePath);
-          
-        if (error) {
-          throw error;
-        }
-        
-        // Create download link
-        const url = URL.createObjectURL(data);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${nft.title.replace(/\s+/g, "_")}.png`;
-        document.body.appendChild(a);
-        a.click();
-        
-        // Clean up
-        URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      } else {
-        // For external images, open in new tab
-        window.open(nft.image, "_blank");
+      } catch (error) {
+        console.error("Error fetching purchases:", error);
+      } finally {
+        setLoading(false);
       }
-      
-      toast({
-        title: "Success",
-        description: "Your NFT image has been downloaded.",
-      });
-    } catch (error) {
-      console.error("Error downloading NFT:", error);
-      toast({
-        title: "Download Failed",
-        description: "There was an error downloading your NFT.",
-        variant: "destructive",
-      });
-    }
-  };
-  
+    };
+
+    fetchPurchases();
+  }, [user]);
+
   if (!user) {
     return (
       <div className="flex flex-col min-h-screen">
@@ -126,7 +187,7 @@ const Profile = () => {
       </div>
     );
   }
-  
+
   return (
     <div className="flex flex-col min-h-screen">
       <Navbar />
@@ -142,14 +203,12 @@ const Profile = () => {
                   className="w-full h-full object-cover"
                 />
               </div>
-              
+
               <div className="text-center md:text-left">
                 <h1 className="text-3xl font-medium mb-2">
                   {user.user_metadata?.full_name || "User"}
                 </h1>
-                <p className="text-muted-foreground mb-3">
-                  {user.email}
-                </p>
+                <p className="text-muted-foreground mb-3">{user.email}</p>
                 <div className="flex flex-wrap gap-4 justify-center md:justify-start">
                   <div className="text-center px-4">
                     <p className="font-medium text-xl">{userNfts.length}</p>
@@ -163,14 +222,18 @@ const Profile = () => {
               </div>
             </div>
           </div>
-          
+
           {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <Tabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="w-full"
+          >
             <TabsList className="mb-8">
               <TabsTrigger value="collection">My Collection</TabsTrigger>
               <TabsTrigger value="purchases">Purchase History</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="collection">
               {loading ? (
                 <div className="flex justify-center py-12">
@@ -188,31 +251,44 @@ const Profile = () => {
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {userNfts.map((nft) => (
-                    <div key={nft.id} className="group relative">
-                      <Link to={`/nft/${nft.id}`}>
-                        <NFTCard nft={nft} />
-                      </Link>
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
-                        <Button 
-                          variant="secondary" 
-                          size="sm" 
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleDownloadNFT(nft);
-                          }}
-                          className="backdrop-blur-sm bg-white/20 hover:bg-white/40"
-                        >
-                          <Download className="h-4 w-4 mr-2" />
-                          Download
-                        </Button>
+                    <div
+                      key={nft.id}
+                      className="group relative aspect-square overflow-hidden rounded-xl bg-gray-100"
+                    >
+                      <img
+                        src={nft.image_url}
+                        alt={nft.title}
+                        className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/60 to-transparent p-4 opacity-0 transition-opacity group-hover:opacity-100">
+                        <div className="flex w-full items-center justify-between">
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-white">
+                              {nft.title}
+                            </h3>
+                          </div>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (nft.image_url) {
+                                window.open(nft.image_url, "_blank");
+                              }
+                            }}
+                            className="backdrop-blur-sm bg-white/20 hover:bg-white/40"
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
             </TabsContent>
-            
+
             <TabsContent value="purchases">
               {loading ? (
                 <div className="flex justify-center py-12">
@@ -228,61 +304,88 @@ const Profile = () => {
                   </Button>
                 </div>
               ) : (
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {purchases.map((purchase) => (
-                    <div key={purchase.id} className="border rounded-lg p-6">
-                      <div className="flex flex-col md:flex-row justify-between mb-4">
-                        <div>
-                          <p className="text-sm text-muted-foreground">
-                            Order ID: {purchase.id.substring(0, 8)}...
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Date: {new Date(purchase.created_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="md:text-right mt-2 md:mt-0">
-                          <p className="font-medium">${parseFloat(purchase.total_amount.toString()).toFixed(2)}</p>
-                          <span className="inline-block px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
-                            {purchase.status}
-                          </span>
+                    <div
+                      key={purchase.id}
+                      className="bg-white rounded-lg shadow overflow-hidden"
+                    >
+                      {/* Purchase Header */}
+                      <div className="p-4 border-b">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="text-sm text-gray-600">
+                              Order ID: {purchase.id}
+                            </p>
+                            <p className="text-sm text-gray-600 mt-1">
+                              Date:{" "}
+                              {new Date(
+                                purchase.created_at
+                              ).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xl font-semibold">
+                              $
+                              {parseFloat(
+                                purchase.total_amount.toString()
+                              ).toFixed(2)}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                      
-                      <div className="divide-y">
-                        {purchase.items.map((item) => (
-                          <div key={item.id} className="py-4 flex flex-col sm:flex-row gap-4">
-                            <div className="w-full sm:w-24 h-24 bg-secondary rounded-md overflow-hidden">
-                              <img
-                                src={item.nft?.image || "/placeholder.svg"}
-                                alt={item.nft?.title || "NFT"}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <div className="flex-grow flex flex-col sm:flex-row sm:justify-between">
-                              <div>
-                                <h3 className="font-medium">
-                                  <Link to={`/nft/${item.nft_id}`} className="hover:text-primary transition-colors">
-                                    {item.nft?.title || "NFT"}
-                                  </Link>
-                                </h3>
-                                <p className="text-sm text-muted-foreground line-clamp-1">
-                                  {item.nft?.description || "No description available"}
-                                </p>
-                                <p className="text-sm">
-                                  Quantity: {item.quantity}
-                                </p>
-                              </div>
-                              <div className="mt-2 sm:mt-0 sm:text-right">
-                                <p className="font-medium">${parseFloat(item.price_per_item.toString()).toFixed(2)}</p>
-                                <Button 
-                                  variant="outline" 
+
+                      {/* Purchase Items */}
+                      <div className="divide-y divide-gray-100">
+                        {purchaseItems[purchase.id]?.map((item) => (
+                          <div key={item.id} className="p-6">
+                            <div className="flex items-start gap-6">
+                              {/* NFT Image */}
+                              <div className="relative w-32 h-32 flex-shrink-0">
+                                <Link to={`/nft/${item.nft_id}`}>
+                                  <img
+                                    src={
+                                      item.nft?.image_url || "/placeholder.svg"
+                                    }
+                                    alt={item.nft?.title || "NFT"}
+                                    className="w-full h-full object-cover rounded-lg"
+                                  />
+                                </Link>
+                                <Button
+                                  variant="secondary"
                                   size="sm"
-                                  className="mt-2"
-                                  onClick={() => item.nft && handleDownloadNFT(item.nft)}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    if (item.nft?.image_url) {
+                                      window.open(item.nft.image_url, "_blank");
+                                    }
+                                  }}
+                                  className="absolute bottom-2 right-2 backdrop-blur-sm bg-black/50 hover:bg-black/70 text-white"
                                 >
-                                  <Download className="h-4 w-4 mr-2" />
-                                  Download
+                                  <Download className="h-4 w-4" />
                                 </Button>
+                              </div>
+
+                              {/* NFT Details */}
+                              <div className="flex-grow">
+                                <Link
+                                  to={`/nft/${item.nft_id}`}
+                                  className="text-lg font-medium hover:text-primary transition-colors"
+                                >
+                                  {item.nft?.title || "NFT"}
+                                </Link>
+                                <p className="text-sm text-gray-600 mt-1">
+                                  Quantity: {item.quantity} × $
+                                  {parseFloat(
+                                    item.price_per_item.toString()
+                                  ).toFixed(2)}
+                                </p>
+                                {item.nft?.description && (
+                                  <p className="text-sm text-gray-600 mt-2 line-clamp-2">
+                                    {item.nft.description}
+                                  </p>
+                                )}
                               </div>
                             </div>
                           </div>

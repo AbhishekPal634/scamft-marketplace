@@ -1,12 +1,7 @@
 import { useState, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { 
-  Filter, 
-  ArrowUpDown, 
-  X, 
-  SlidersHorizontal,
-} from "lucide-react";
+import { Filter, ArrowUpDown, X, SlidersHorizontal } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Slider } from "../components/ui/slider";
 import { Separator } from "../components/ui/separator";
@@ -36,9 +31,14 @@ import { useSearch } from "../hooks/useSearch";
 const Explore = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { nfts, fetchMarketplaceNFTs, filterNFTs } = useNFTStore();
-  const { search, results: searchResults, isLoading: searchLoading } = useSearch();
-  
+  const {
+    search,
+    results: searchResults,
+    isLoading: searchLoading,
+  } = useSearch();
+
   const [filteredNFTs, setFilteredNFTs] = useState<NFT[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -46,49 +46,56 @@ const Explore = () => {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
   const [sortOption, setSortOption] = useState<string>("recent");
   const [activeTags, setActiveTags] = useState<string[]>([]);
-  
+
   // Extract query parameters on page load
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const category = params.get("category");
     const searchParam = params.get("search");
-    
+
     if (category) {
       setActiveCategory(category.toLowerCase());
     }
-    
+
     if (searchParam) {
       setSearchQuery(searchParam);
       // Perform search when search parameter is present
       search(searchParam);
     }
   }, [location.search, search]);
-  
+
   // Fetch NFTs and apply initial filters
   useEffect(() => {
     const initializeData = async () => {
       setLoading(true);
-      
+
       // Always fetch marketplace NFTs (only those listed for sale)
       await fetchMarketplaceNFTs();
-      
+
       setLoading(false);
     };
-    
+
     initializeData();
   }, [fetchMarketplaceNFTs]);
-  
+
+  // Refresh NFTs when returning from a successful purchase
+  useEffect(() => {
+    if (searchParams.get("success") === "true") {
+      fetchMarketplaceNFTs();
+    }
+  }, [searchParams, fetchMarketplaceNFTs]);
+
   // Apply filters whenever filter settings change
   useEffect(() => {
     // If we're still loading, don't apply filters yet
     if (loading) return;
-    
+
     // If we have search results, use those instead of applying filters
     if (searchQuery && searchResults.length > 0) {
       setFilteredNFTs(searchResults);
       return;
     }
-    
+
     // Apply filters to the NFTs
     const filters: NFTFilters = {
       sortBy: sortOption as any,
@@ -96,42 +103,42 @@ const Explore = () => {
       maxPrice: priceRange[1],
       tags: activeTags.length > 0 ? activeTags : undefined,
     };
-    
+
     if (activeCategory !== "all") {
       filters.category = activeCategory;
     }
-    
+
     const filtered = filterNFTs(filters);
     setFilteredNFTs(filtered);
-    
+
     // Update URL with filters
     const params = new URLSearchParams();
     if (activeCategory !== "all") {
       params.set("category", activeCategory);
     }
-    
+
     if (searchQuery) {
       params.set("search", searchQuery);
     }
-    
+
     navigate({ search: params.toString() }, { replace: true });
   }, [
-    activeCategory, 
-    priceRange, 
-    sortOption, 
-    activeTags, 
-    filterNFTs, 
+    activeCategory,
+    priceRange,
+    sortOption,
+    activeTags,
+    filterNFTs,
     navigate,
     loading,
     searchQuery,
     searchResults,
-    nfts
+    nfts,
   ]);
-  
+
   const handleSearch = (query: string) => {
     setSearchQuery(query);
     search(query);
-    
+
     // Update URL with search query
     const params = new URLSearchParams(location.search);
     if (query) {
@@ -141,7 +148,7 @@ const Explore = () => {
     }
     navigate({ search: params.toString() }, { replace: true });
   };
-  
+
   const handleCategoryChange = (category: string) => {
     setActiveCategory(category);
     // Clear search when changing category
@@ -152,26 +159,24 @@ const Explore = () => {
       navigate({ search: params.toString() }, { replace: true });
     }
   };
-  
+
   const handleTagToggle = (tag: string) => {
-    setActiveTags(prev => 
-      prev.includes(tag)
-        ? prev.filter(t => t !== tag)
-        : [...prev, tag]
+    setActiveTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
     );
   };
-  
+
   const handleClearFilters = () => {
     setActiveCategory("all");
     setPriceRange([0, 1000]);
     setSortOption("recent");
     setActiveTags([]);
     setSearchQuery("");
-    
+
     // Clear URL params
     navigate("/explore", { replace: true });
   };
-  
+
   // All available categories
   const categories = [
     { id: "all", name: "All NFTs" },
@@ -181,13 +186,21 @@ const Explore = () => {
     { id: "video", name: "Video" },
     { id: "collectible", name: "Collectibles" },
   ];
-  
+
   // Popular tags (in a real app, these would be dynamically generated)
   const popularTags = [
-    "abstract", "space", "nature", "cityscape", "generative", 
-    "pixel", "minimal", "cyberpunk", "portrait", "3D",
+    "abstract",
+    "space",
+    "nature",
+    "cityscape",
+    "generative",
+    "pixel",
+    "minimal",
+    "cyberpunk",
+    "portrait",
+    "3D",
   ];
-  
+
   // Animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -195,22 +208,22 @@ const Explore = () => {
       opacity: 1,
       transition: {
         staggerChildren: 0.05,
-      }
-    }
+      },
+    },
   };
-  
+
   const itemVariants = {
     hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.4 } }
+    show: { opacity: 1, y: 0, transition: { duration: 0.4 } },
   };
 
   // Determine if we're in a loading state
   const isLoadingData = loading || searchLoading;
-  
+
   return (
     <div className="flex flex-col min-h-screen">
       <Navbar />
-      
+
       <main className="flex-grow pt-12 pb-16">
         <div className="page-container">
           {/* Page Header */}
@@ -220,10 +233,10 @@ const Explore = () => {
               Discover unique digital art from creators around the world
             </p>
           </div>
-          
+
           {/* Search Bar */}
           <div className="mb-6 max-w-xl">
-            <SearchBar 
+            <SearchBar
               initialQuery={searchQuery}
               onSearch={handleSearch}
               size="lg"
@@ -231,15 +244,12 @@ const Explore = () => {
               className="w-full"
             />
           </div>
-          
+
           {/* Filter Controls */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
             <div className="flex items-center gap-2 w-full md:w-auto">
               {/* Sort Dropdown */}
-              <Select 
-                value={sortOption} 
-                onValueChange={setSortOption}
-              >
+              <Select value={sortOption} onValueChange={setSortOption}>
                 <SelectTrigger className="w-[180px] rounded-full bg-secondary/60 border-none">
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
@@ -250,7 +260,7 @@ const Explore = () => {
                   <SelectItem value="popular">Most Popular</SelectItem>
                 </SelectContent>
               </Select>
-              
+
               {/* Mobile Filter Button */}
               <div className="md:hidden">
                 <Sheet>
@@ -267,7 +277,7 @@ const Explore = () => {
                         Refine your NFT search results
                       </SheetDescription>
                     </SheetHeader>
-                    
+
                     <div className="space-y-6">
                       {/* Mobile Categories */}
                       <div>
@@ -288,7 +298,7 @@ const Explore = () => {
                           ))}
                         </div>
                       </div>
-                      
+
                       {/* Mobile Price Range */}
                       <div>
                         <h3 className="font-medium mb-3">Price Range (USD)</h3>
@@ -298,7 +308,9 @@ const Explore = () => {
                             max={1000}
                             step={10}
                             value={priceRange}
-                            onValueChange={(value) => setPriceRange(value as [number, number])}
+                            onValueChange={(value) =>
+                              setPriceRange(value as [number, number])
+                            }
                             className="[&>[data-state=active]]:bg-primary"
                           />
                           <div className="flex justify-between text-sm">
@@ -307,7 +319,7 @@ const Explore = () => {
                           </div>
                         </div>
                       </div>
-                      
+
                       {/* Mobile Tags */}
                       <div>
                         <h3 className="font-medium mb-3">Tags</h3>
@@ -327,14 +339,11 @@ const Explore = () => {
                           ))}
                         </div>
                       </div>
-                      
+
                       <Separator />
-                      
+
                       <div className="flex justify-between">
-                        <Button
-                          variant="outline"
-                          onClick={handleClearFilters}
-                        >
+                        <Button variant="outline" onClick={handleClearFilters}>
                           Clear All
                         </Button>
                         <SheetClose asChild>
@@ -345,10 +354,13 @@ const Explore = () => {
                   </SheetContent>
                 </Sheet>
               </div>
-              
+
               {/* Clear Filters Button (shown when filters are active) */}
-              {(activeCategory !== "all" || activeTags.length > 0 || 
-                priceRange[0] > 0 || priceRange[1] < 1000 || searchQuery) && (
+              {(activeCategory !== "all" ||
+                activeTags.length > 0 ||
+                priceRange[0] > 0 ||
+                priceRange[1] < 1000 ||
+                searchQuery) && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -361,7 +373,7 @@ const Explore = () => {
               )}
             </div>
           </div>
-          
+
           {/* Main Content */}
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             {/* Desktop Filters Sidebar */}
@@ -385,9 +397,9 @@ const Explore = () => {
                   ))}
                 </div>
               </div>
-              
+
               <Separator />
-              
+
               {/* Price Range */}
               <div>
                 <h3 className="font-medium mb-3">Price Range (USD)</h3>
@@ -397,7 +409,9 @@ const Explore = () => {
                     max={1000}
                     step={10}
                     value={priceRange}
-                    onValueChange={(value) => setPriceRange(value as [number, number])}
+                    onValueChange={(value) =>
+                      setPriceRange(value as [number, number])
+                    }
                     className="[&>[data-state=active]]:bg-primary"
                   />
                   <div className="flex justify-between text-sm">
@@ -406,9 +420,9 @@ const Explore = () => {
                   </div>
                 </div>
               </div>
-              
+
               <Separator />
-              
+
               {/* Tags */}
               <div>
                 <h3 className="font-medium mb-3">Tags</h3>
@@ -429,18 +443,22 @@ const Explore = () => {
                 </div>
               </div>
             </div>
-            
+
             {/* NFT Grid */}
             <div className="lg:col-span-3">
               {/* Active Filters Summary */}
-              {(activeCategory !== "all" || searchQuery || activeTags.length > 0) && (
+              {(activeCategory !== "all" ||
+                searchQuery ||
+                activeTags.length > 0) && (
                 <div className="mb-6 flex flex-wrap items-center gap-2">
-                  <span className="text-sm text-muted-foreground">Active filters:</span>
-                  
+                  <span className="text-sm text-muted-foreground">
+                    Active filters:
+                  </span>
+
                   {activeCategory !== "all" && (
                     <span className="inline-flex items-center px-3 py-1 rounded-full text-xs bg-secondary">
                       Category: {activeCategory}
-                      <button 
+                      <button
                         onClick={() => handleCategoryChange("all")}
                         className="ml-1.5 hover:text-muted-foreground"
                         aria-label="Remove category filter"
@@ -449,11 +467,11 @@ const Explore = () => {
                       </button>
                     </span>
                   )}
-                  
+
                   {searchQuery && (
                     <span className="inline-flex items-center px-3 py-1 rounded-full text-xs bg-secondary">
                       Search: {searchQuery}
-                      <button 
+                      <button
                         onClick={() => {
                           setSearchQuery("");
                           navigate("/explore", { replace: true });
@@ -465,14 +483,14 @@ const Explore = () => {
                       </button>
                     </span>
                   )}
-                  
-                  {activeTags.map(tag => (
-                    <span 
+
+                  {activeTags.map((tag) => (
+                    <span
                       key={tag}
                       className="inline-flex items-center px-3 py-1 rounded-full text-xs bg-secondary"
                     >
                       Tag: {tag}
-                      <button 
+                      <button
                         onClick={() => handleTagToggle(tag)}
                         className="ml-1.5 hover:text-muted-foreground"
                         aria-label={`Remove ${tag} tag filter`}
@@ -483,7 +501,7 @@ const Explore = () => {
                   ))}
                 </div>
               )}
-              
+
               {/* Results Count */}
               <div className="mb-6">
                 <p className="text-sm text-muted-foreground">
@@ -492,7 +510,7 @@ const Explore = () => {
                     : `Showing ${filteredNFTs.length} results`}
                 </p>
               </div>
-              
+
               {/* Loading State */}
               {isLoadingData ? (
                 <div className="min-h-[300px] flex items-center justify-center">
@@ -504,7 +522,7 @@ const Explore = () => {
                   </div>
                 </div>
               ) : filteredNFTs.length > 0 ? (
-                <motion.div 
+                <motion.div
                   className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
                   variants={containerVariants}
                   initial="hidden"
@@ -521,7 +539,8 @@ const Explore = () => {
                   <div className="text-center max-w-md">
                     <h3 className="text-lg font-medium mb-2">No NFTs Found</h3>
                     <p className="text-muted-foreground mb-6">
-                      We couldn't find any NFTs matching your current filters. Try adjusting your filters or search terms.
+                      We couldn't find any NFTs matching your current filters.
+                      Try adjusting your filters or search terms.
                     </p>
                     <Button onClick={handleClearFilters}>
                       Clear All Filters
@@ -533,7 +552,7 @@ const Explore = () => {
           </div>
         </div>
       </main>
-      
+
       <Footer />
     </div>
   );

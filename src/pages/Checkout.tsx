@@ -1,13 +1,12 @@
-
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { 
-  ArrowLeft, 
-  CreditCard, 
-  Shield, 
+import {
+  ArrowLeft,
+  CreditCard,
+  Shield,
   CheckCircle2,
-  Loader2
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -17,110 +16,164 @@ import Footer from "@/components/layout/Footer";
 import { useCartStore } from "@/services/cartService";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useNFTStore } from "@/services/nftService";
 
 const Checkout = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { items, getTotal, clearCart } = useCartStore();
   const { toast } = useToast();
   const { user } = useAuth();
-  
+  const { completePurchase } = useNFTStore();
+
   const [processing, setProcessing] = useState<boolean>(false);
   const [completed, setCompleted] = useState<boolean>(false);
-  
+
   // If cart is empty, redirect to cart page
   if (items.length === 0 && !completed) {
     navigate("/cart");
     return null;
   }
-  
+
   // Calculate totals
   const subtotal = getTotal();
   const serviceFee = subtotal * 0.025; // 2.5% service fee
   const total = subtotal + serviceFee;
-  
+
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Prevent checkout if not authenticated
     if (!user) {
       toast({
         title: "Authentication required",
         description: "Please sign in to complete your purchase",
-        variant: "destructive"
+        variant: "destructive",
       });
       navigate("/login");
       return;
     }
-    
+
     // Show processing state
     setProcessing(true);
-    
+
     try {
-      // Prepare cart items for metadata
-      const itemsMetadata = items.map(item => ({
+      // Format items to only include necessary data for the checkout function
+      const formattedItems = items.map((item) => ({
+        nft: {
+          id: item.nft.id,
+          title: item.nft.title,
+          price: item.nft.price,
+          image_url: item.nft.image_url,
+        },
+        quantity: item.quantity
+      }));
+
+      // Prepare cart items for metadata (minimal data needed)
+      const itemsMetadata = JSON.stringify(items.map((item) => ({
         id: item.nft.id,
         quantity: item.quantity,
-        price: item.nft.price
-      }));
-      
-      const response = await supabase.functions.invoke('create-checkout', {
+        price: item.nft.price,
+      })));
+
+      console.log("Sending checkout request with:", { 
+        itemsCount: formattedItems.length,
+        userId: user.id 
+      });
+
+      const response = await supabase.functions.invoke("create-checkout", {
         body: {
-          items: items,
+          items: formattedItems,
           userId: user.id,
-          itemsMetadata: JSON.stringify(itemsMetadata), // Send as string to avoid metadata issues
+          itemsMetadata, // Already stringified
           successUrl: `${window.location.origin}/profile?success=true`,
-          cancelUrl: `${window.location.origin}/cart?canceled=true`
-        }
+          cancelUrl: `${window.location.origin}/cart?canceled=true`,
+        },
       });
 
       if (response.error) {
-        throw new Error(response.error.message || 'Failed to create checkout session');
+        console.error("Checkout function error details:", response.error);
+        throw new Error(
+          response.error.message || "Failed to create checkout session"
+        );
       }
 
+      // Check response structure
+      console.log("Checkout response received:", response);
+      
       // Redirect to Stripe Checkout
       if (response.data?.url) {
         window.location.href = response.data.url;
       } else {
-        throw new Error('No checkout URL received');
+        console.error("Invalid response format:", response);
+        throw new Error("No checkout URL received");
       }
     } catch (error: any) {
-      console.error('Checkout error:', error);
+      console.error("Checkout error details:", error);
       toast({
         title: "Checkout failed",
-        description: error.message || "Could not process payment. Please try again.",
-        variant: "destructive"
+        description:
+          error.message || "Could not process payment. Please try again.",
+        variant: "destructive",
       });
       setProcessing(false);
     }
   };
-  
+
   // Check for success parameter in URL (this would happen when returning from successful payment)
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
-    if (query.get('success') === 'true') {
-      setCompleted(true);
-      clearCart();
-      
-      toast({
-        title: "Purchase successful!",
-        description: "Your NFTs have been added to your collection."
-      });
-      
-      // After successful purchase, refresh the page after a short delay to load updated data
-      const timer = setTimeout(() => {
-        navigate("/profile");
-      }, 3000);
-      
-      return () => clearTimeout(timer);
+    const purchaseId = query.get("purchase_id");
+
+    if (query.get("success") === "true" && purchaseId && user) {
+      const handleSuccess = async () => {
+        try {
+          setProcessing(true);
+
+          // Complete the purchase and update NFT ownership
+          const success = await completePurchase(purchaseId, user.id);
+
+          if (!success) {
+            throw new Error("Failed to complete purchase");
+          }
+
+          setCompleted(true);
+          clearCart();
+
+          toast({
+            title: "Purchase successful!",
+            description: "Your NFTs have been added to your collection.",
+          });
+
+          // After successful purchase, refresh the page after a short delay to load updated data
+          const timer = setTimeout(() => {
+            navigate("/profile");
+          }, 3000);
+
+          return () => clearTimeout(timer);
+        } catch (error) {
+          console.error("Error completing purchase:", error);
+          toast({
+            title: "Error",
+            description:
+              "There was an error completing your purchase. Please contact support.",
+            variant: "destructive",
+          });
+        } finally {
+          setProcessing(false);
+        }
+      };
+
+      handleSuccess();
     }
-  }, []);
-  
+  }, [user, completePurchase, clearCart, toast, navigate]);
+
   if (completed) {
     return (
       <div className="flex flex-col min-h-screen">
         <Navbar />
         <main className="flex-grow pt-32 pb-16 flex items-center justify-center">
-          <motion.div 
+          <motion.div
             className="max-w-md w-full text-center glass p-8 rounded-xl space-y-6"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -129,21 +182,19 @@ const Checkout = () => {
             <div className="rounded-full bg-primary/10 p-4 mx-auto w-20 h-20 flex items-center justify-center">
               <CheckCircle2 className="h-10 w-10 text-primary" />
             </div>
-            
+
             <h1 className="text-2xl font-medium">Purchase Complete!</h1>
-            
+
             <p className="text-muted-foreground">
-              Thank you for your purchase. Your NFTs have been successfully added to your collection.
+              Thank you for your purchase. Your NFTs have been successfully
+              added to your collection.
             </p>
-            
+
             <div className="pt-4 flex flex-col sm:flex-row gap-4 justify-center">
-              <Button
-                variant="outline"
-                onClick={() => navigate("/explore")}
-              >
+              <Button variant="outline" onClick={() => navigate("/explore")}>
                 Continue Shopping
               </Button>
-              
+
               <Button onClick={() => navigate("/profile")}>
                 View My Collection
               </Button>
@@ -154,7 +205,7 @@ const Checkout = () => {
       </div>
     );
   }
-  
+
   return (
     <div className="flex flex-col min-h-screen">
       <Navbar />
@@ -168,9 +219,9 @@ const Checkout = () => {
             <ArrowLeft className="h-4 w-4 mr-1" />
             Back to Cart
           </button>
-          
+
           <h1 className="text-2xl font-medium mb-8">Checkout</h1>
-          
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Checkout Form */}
             <div className="lg:col-span-2">
@@ -183,21 +234,22 @@ const Checkout = () => {
                   {/* Payment Information */}
                   <div className="glass rounded-xl p-6 space-y-4">
                     <h2 className="text-lg font-medium">Payment Method</h2>
-                    
+
                     <div className="flex items-center space-x-3 p-3 rounded-lg border border-border bg-secondary/10">
                       <CreditCard className="h-5 w-5 mr-3 text-primary" />
                       <div>
                         <div>Stripe Secure Checkout</div>
                         <div className="text-xs text-muted-foreground mt-1">
-                          You'll be redirected to Stripe to complete your purchase securely.
+                          You'll be redirected to Stripe to complete your
+                          purchase securely.
                         </div>
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Submit Button */}
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     className="w-full rounded-full"
                     size="lg"
                     disabled={processing}
@@ -214,7 +266,7 @@ const Checkout = () => {
                 </form>
               </motion.div>
             </div>
-            
+
             {/* Order Summary */}
             <div className="lg:col-span-1">
               <motion.div
@@ -224,11 +276,14 @@ const Checkout = () => {
                 className="glass rounded-xl p-6 space-y-4 sticky top-28"
               >
                 <h2 className="text-lg font-medium">Order Summary</h2>
-                
+
                 {/* Order Items */}
                 <div className="space-y-3 my-4">
                   {items.map((item) => (
-                    <div key={item.nft.id} className="flex justify-between text-sm">
+                    <div
+                      key={item.nft.id}
+                      className="flex justify-between text-sm"
+                    >
                       <div className="flex-1">
                         <div className="font-medium">{item.nft.title}</div>
                         <div className="text-xs text-muted-foreground">
@@ -241,23 +296,25 @@ const Checkout = () => {
                     </div>
                   ))}
                 </div>
-                
+
                 <Separator />
-                
+
                 {/* Order Totals */}
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Subtotal</span>
                     <span>${subtotal.toFixed(2)}</span>
                   </div>
-                  
+
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Service Fee (2.5%)</span>
+                    <span className="text-muted-foreground">
+                      Service Fee (2.5%)
+                    </span>
                     <span>${serviceFee.toFixed(2)}</span>
                   </div>
-                  
+
                   <Separator className="my-2" />
-                  
+
                   <div className="flex justify-between font-medium">
                     <span>Total</span>
                     <div className="text-right">
@@ -265,7 +322,7 @@ const Checkout = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="pt-4">
                   <div className="flex items-center text-xs text-muted-foreground">
                     <Shield className="h-3.5 w-3.5 mr-1 flex-shrink-0" />

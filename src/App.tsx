@@ -22,26 +22,38 @@ function App() {
         <Route path="/explore" element={<Explore />} />
         <Route path="/nft/:id" element={<NFTDetail />} />
         <Route path="/cart" element={<Cart />} />
-        <Route path="/checkout" element={
-          <ProtectedRoute>
-            <Checkout />
-          </ProtectedRoute>
-        } />
-        <Route path="/profile" element={
-          <ProtectedRoute>
-            <Profile />
-          </ProtectedRoute>
-        } />
-        <Route path="/create" element={
-          <ProtectedRoute>
-            <CreateListing />
-          </ProtectedRoute>
-        } />
-        <Route path="/my-listings" element={
-          <ProtectedRoute>
-            <MyListings />
-          </ProtectedRoute>
-        } />
+        <Route
+          path="/checkout"
+          element={
+            <ProtectedRoute>
+              <Checkout />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <Profile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/create"
+          element={
+            <ProtectedRoute>
+              <CreateListing />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/my-listings"
+          element={
+            <ProtectedRoute>
+              <MyListings />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="*" element={<NotFound />} />
