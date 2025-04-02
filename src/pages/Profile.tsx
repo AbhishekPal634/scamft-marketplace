@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useNFTStore, NFT, Purchase } from "@/services/nftService";
@@ -9,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
+import { Link, useSearchParams } from "react-router-dom";
 
 const Profile = () => {
   const { user } = useAuth();
@@ -19,6 +19,7 @@ const Profile = () => {
   const [userNfts, setUserNfts] = useState<NFT[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [activeTab, setActiveTab] = useState("collection");
+  const [searchParams] = useSearchParams();
   
   useEffect(() => {
     const fetchUserData = async () => {
@@ -33,12 +34,23 @@ const Profile = () => {
           // Get user's purchase history
           const purchaseHistory = await getUserPurchases(user.id);
           setPurchases(purchaseHistory);
+          
+          // Check for success parameter in URL
+          if (searchParams.get('success') === 'true') {
+            toast({
+              title: "Purchase Complete!",
+              description: "Your NFTs have been added to your collection."
+            });
+            
+            // Set active tab to show purchases if coming from successful checkout
+            setActiveTab("purchases");
+          }
         } catch (error) {
           console.error("Error fetching user data:", error);
           toast({
             title: "Error",
             description: "Failed to load your profile data. Please try again.",
-            variant: "destructive",
+            variant: "destructive"
           });
         } finally {
           setLoading(false);
@@ -47,7 +59,7 @@ const Profile = () => {
     };
     
     fetchUserData();
-  }, [user, getUserNfts, getUserPurchases, toast]);
+  }, [user, getUserNfts, getUserPurchases, toast, searchParams]);
   
   const handleDownloadNFT = async (nft: NFT) => {
     try {
@@ -169,13 +181,17 @@ const Profile = () => {
                   <p className="text-muted-foreground mb-4">
                     You don't have any NFTs in your collection yet.
                   </p>
-                  <Button variant="outline">Browse Marketplace</Button>
+                  <Button variant="outline" asChild>
+                    <Link to="/explore">Browse Marketplace</Link>
+                  </Button>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {userNfts.map((nft) => (
                     <div key={nft.id} className="group relative">
-                      <NFTCard nft={nft} />
+                      <Link to={`/nft/${nft.id}`}>
+                        <NFTCard nft={nft} />
+                      </Link>
                       <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
                         <Button 
                           variant="secondary" 
@@ -207,7 +223,9 @@ const Profile = () => {
                   <p className="text-muted-foreground mb-4">
                     You haven't made any purchases yet.
                   </p>
-                  <Button variant="outline">Browse Marketplace</Button>
+                  <Button variant="outline" asChild>
+                    <Link to="/explore">Browse Marketplace</Link>
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-6">
@@ -242,7 +260,11 @@ const Profile = () => {
                             </div>
                             <div className="flex-grow flex flex-col sm:flex-row sm:justify-between">
                               <div>
-                                <h3 className="font-medium">{item.nft?.title || "NFT"}</h3>
+                                <h3 className="font-medium">
+                                  <Link to={`/nft/${item.nft_id}`} className="hover:text-primary transition-colors">
+                                    {item.nft?.title || "NFT"}
+                                  </Link>
+                                </h3>
                                 <p className="text-sm text-muted-foreground line-clamp-1">
                                   {item.nft?.description || "No description available"}
                                 </p>

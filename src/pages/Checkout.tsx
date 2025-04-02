@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import { useCartStore } from "@/services/cartService";
@@ -56,10 +56,18 @@ const Checkout = () => {
     setProcessing(true);
     
     try {
+      // Prepare cart items for metadata
+      const itemsMetadata = items.map(item => ({
+        id: item.nft.id,
+        quantity: item.quantity,
+        price: item.nft.price
+      }));
+      
       const response = await supabase.functions.invoke('create-checkout', {
         body: {
           items: items,
           userId: user.id,
+          itemsMetadata: JSON.stringify(itemsMetadata), // Send as string to avoid metadata issues
           successUrl: `${window.location.origin}/profile?success=true`,
           cancelUrl: `${window.location.origin}/cart?canceled=true`
         }
@@ -95,8 +103,15 @@ const Checkout = () => {
       
       toast({
         title: "Purchase successful!",
-        description: "Your NFTs have been added to your collection.",
+        description: "Your NFTs have been added to your collection."
       });
+      
+      // After successful purchase, refresh the page after a short delay to load updated data
+      const timer = setTimeout(() => {
+        navigate("/profile");
+      }, 3000);
+      
+      return () => clearTimeout(timer);
     }
   }, []);
   
