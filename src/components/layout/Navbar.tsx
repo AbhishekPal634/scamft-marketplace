@@ -11,7 +11,11 @@ import {
   DropdownMenuTrigger,
 } from "../../components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "../../components/ui/sheet";
-import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "../../components/ui/avatar";
 import { Menu, X, Search, ShoppingCart, User } from "lucide-react";
 import { Input } from "../../components/ui/input";
 import { useSearch } from "../../hooks/useSearch";
@@ -61,10 +65,72 @@ const Navbar = () => {
 
   const closeMenu = () => setOpen(false);
   const userNavItems = [
-    { id: "profile", label: "Profile", href: "/profile", icon: <User className="h-4 w-4 mr-2" /> },
-    { id: "my-nfts", label: "My NFTs", href: "/profile?tab=collection", icon: <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg> },
-    { id: "listings", label: "My Listings", href: "/my-listings", icon: <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg> },
-    { id: "create", label: "Create NFT", href: "/create", icon: <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg> },
+    {
+      id: "profile",
+      label: "Profile",
+      href: "/profile",
+      icon: <User className="h-4 w-4 mr-2" />,
+    },
+    {
+      id: "my-nfts",
+      label: "My NFTs",
+      href: "/profile?tab=collection",
+      icon: (
+        <svg
+          className="h-4 w-4 mr-2"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+          />
+        </svg>
+      ),
+    },
+    {
+      id: "listings",
+      label: "My Listings",
+      href: "/my-listings",
+      icon: (
+        <svg
+          className="h-4 w-4 mr-2"
+          fill="none"
+          viewBox="0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+          />
+        </svg>
+      ),
+    },
+    {
+      id: "create",
+      label: "Create NFT",
+      href: "/create",
+      icon: (
+        <svg
+          className="h-4 w-4 mr-2"
+          fill="none"
+          viewBox="0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M12 4v16m8-8H4"
+          />
+        </svg>
+      ),
+    },
   ];
 
   const authButtons = (
@@ -75,7 +141,9 @@ const Navbar = () => {
             <Button variant="ghost" className="relative h-10 w-10 rounded-full">
               <Avatar>
                 <AvatarImage src={user.user_metadata?.avatar_url || ""} />
-                <AvatarFallback>{user.email?.charAt(0)?.toUpperCase() || "U"}</AvatarFallback>
+                <AvatarFallback>
+                  {user.email?.charAt(0)?.toUpperCase() || "U"}
+                </AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
@@ -131,7 +199,7 @@ const Navbar = () => {
               <span className="sr-only">Close menu</span>
             </Button>
           </div>
-          
+
           <div className="flex flex-col gap-4 py-4">
             {navItems.map((item) => (
               <Link
@@ -143,7 +211,7 @@ const Navbar = () => {
                 {item.name}
               </Link>
             ))}
-            
+
             {user && (
               <>
                 {userNavItems.map((item) => (
@@ -168,15 +236,23 @@ const Navbar = () => {
                 </button>
               </>
             )}
-            
+
             {!user && (
               <div className="flex flex-col gap-2 mt-2">
-                <Button onClick={() => { navigate("/login"); closeMenu(); }}>
+                <Button
+                  onClick={() => {
+                    navigate("/login");
+                    closeMenu();
+                  }}
+                >
                   Sign In
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => { navigate("/register"); closeMenu(); }}
+                  onClick={() => {
+                    navigate("/register");
+                    closeMenu();
+                  }}
                 >
                   Register
                 </Button>
@@ -226,7 +302,9 @@ const Navbar = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onFocus={() => setShowSearchResults(true)}
-                onBlur={() => setTimeout(() => setShowSearchResults(false), 200)}
+                onBlur={() =>
+                  setTimeout(() => setShowSearchResults(false), 200)
+                }
               />
             </form>
             {showSearchResults && results.length > 0 && (
@@ -286,8 +364,11 @@ const Navbar = () => {
                 <ShoppingCart className="h-5 w-5" />
                 <span className="sr-only">Shopping cart</span>
                 {cartItemCount > 0 && (
-                  <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
-                    {cartItemCount > 9 ? '9+' : cartItemCount}
+                  <Badge
+                    variant="destructive"
+                    className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+                  >
+                    {cartItemCount > 9 ? "9+" : cartItemCount}
                   </Badge>
                 )}
               </Button>
